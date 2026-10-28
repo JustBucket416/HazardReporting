@@ -10,11 +10,13 @@ const { rejectDelete, routerGate } = require('./src/routing');
 const auth = require('./src/auth');
 const technicianIncidents = require('./src/technician-incidents');
 const operatorIncidents = require('./src/operator-incidents');
+const uploads = require('./src/uploads');
 
 const passToRouter = (req, res, next) => next();
 
 /** Builds the Express app over `dbFile` (which must exist) and `uploadsDir`. */
-function createApp({ dbFile = config.dbFile, logger = true } = {}) {
+function createApp({ dbFile = config.dbFile, uploadsDir = config.uploadsDir, logger = true } = {}) {
+  uploads.ensureUploadsDir(uploadsDir);
   const app = jsonServer.create();
   const router = jsonServer.router(dbFile);
   const db = router.db;
@@ -27,11 +29,13 @@ function createApp({ dbFile = config.dbFile, logger = true } = {}) {
   app.use(jsonServer.bodyParser);
 
   // Public
+  app.use(uploads.servePhotos(uploadsDir));
   app.post('/login', auth.login(db));
 
   // Everything below needs a valid bearer token.
   app.use(auth.requireAuth(db));
   app.post('/logout', auth.logout(db));
+  app.post('/uploads', uploads.uploadPhoto(uploadsDir));
 
   // Incidents
   const technician = auth.requireRole('technician');
@@ -48,7 +52,7 @@ function createApp({ dbFile = config.dbFile, logger = true } = {}) {
   app.use(
     routerGate({
       routerGets: [/^\/(categories|severities|sites|incidents)\/?$/],
-      knownPaths: [/^\/(login|logout|categories|severities|sites|incidents|users)\/?$/, /^\/incidents\/[^/]+\/?$/],
+      knownPaths: [/^\/(login|logout|categories|severities|sites|incidents|users|uploads)\/?$/, /^\/incidents\/[^/]+\/?$/],
     }),
   );
   app.use(router);
@@ -58,7 +62,7 @@ function createApp({ dbFile = config.dbFile, logger = true } = {}) {
 
 if (require.main === module) {
   ensureDbFile(config.dbFile, config.seedFile);
-  const app = createApp({ dbFile: config.dbFile });
+  const app = createApp({ dbFile: config.dbFile, uploadsDir: config.uploadsDir });
   app.listen(config.port, () => {
     console.log(`Field Incident Reporter server on http://localhost:${config.port} (data: ${config.dbFile})`);
   });
