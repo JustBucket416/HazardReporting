@@ -1,0 +1,10 @@
+node_modules/
+
+# Runtime data: seed.json is the committed source of truth; `npm run reset`
+# (or the first `npm run dev`) creates db.json from it.
+db.json
+*.tmp
+
+# Uploaded photos, except the committed seed photos.
+uploads/*
+!uploads/seed/
