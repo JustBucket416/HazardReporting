@@ -17,6 +17,7 @@ import kotlinx.coroutines.CoroutineScope
 @Component(
     modules = [
         AppModule::class,
+        DatabaseModule::class,
         DataStoreModule::class,
         InteractorModule::class,
         NetworkModule::class,

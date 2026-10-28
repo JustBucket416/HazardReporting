@@ -1,6 +1,8 @@
 package com.example.hazardreporting.di
 
+import com.example.hazardreporting.domain.interactor.CatalogInteractor
 import com.example.hazardreporting.domain.interactor.LoginInteractor
+import com.example.hazardreporting.domain.repository.CatalogRepository
 import com.example.hazardreporting.domain.repository.SessionRepository
 import dagger.Module
 import dagger.Provides
@@ -20,4 +22,11 @@ object InteractorModule {
     @Provides
     fun provideLoginInteractor(sessionRepository: SessionRepository): LoginInteractor =
         LoginInteractor(sessionRepository)
+
+    /**
+     * Provides the [CatalogInteractor]
+     */
+    @Provides
+    fun provideCatalogInteractor(catalogRepository: CatalogRepository): CatalogInteractor =
+        CatalogInteractor(catalogRepository)
 }

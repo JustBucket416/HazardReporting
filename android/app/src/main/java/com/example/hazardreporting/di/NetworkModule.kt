@@ -1,6 +1,7 @@
 package com.example.hazardreporting.di
 
 import com.example.hazardreporting.BuildConfig
+import com.example.hazardreporting.data.catalog.CatalogApi
 import com.example.hazardreporting.data.session.AuthInterceptor
 import com.example.hazardreporting.data.session.SessionApi
 import dagger.Module
@@ -75,4 +76,11 @@ object NetworkModule {
     @Provides
     @Singleton
     fun provideSessionApi(retrofit: Retrofit): SessionApi = retrofit.create()
+
+    /**
+     * Provides the Retrofit interface for the catalog routes
+     */
+    @Provides
+    @Singleton
+    fun provideCatalogApi(retrofit: Retrofit): CatalogApi = retrofit.create()
 }
