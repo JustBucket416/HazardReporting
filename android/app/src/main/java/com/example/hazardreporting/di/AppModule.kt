@@ -1,0 +1,49 @@
+package com.example.hazardreporting.di
+
+import com.example.hazardreporting.utils.AndroidLogger
+import com.example.hazardreporting.utils.CoroutineDispatchers
+import com.example.hazardreporting.utils.Logger
+import dagger.Binds
+import dagger.Module
+import dagger.Provides
+import javax.inject.Singleton
+import kotlinx.coroutines.CoroutineExceptionHandler
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.SupervisorJob
+
+/**
+ * Provides application-wide utilities: the [Logger] and the [ApplicationScope] coroutine scope
+ *
+ * @author Roman Pliskin on 29.10.2026
+ */
+@Module
+interface AppModule {
+
+    /**
+     * Binds [AndroidLogger] as the app's [Logger]
+     */
+    @Binds
+    fun bindLogger(logger: AndroidLogger): Logger
+
+    /**
+     * Provides the bindings that need code
+     */
+    companion object {
+
+        private const val TAG = "ApplicationScope"
+
+        /**
+         * Provides the [ApplicationScope] coroutine scope. A failing child doesn't cancel its siblings,
+         * and an uncaught exception is logged instead of crashing the app
+         */
+        @Provides
+        @Singleton
+        @ApplicationScope
+        fun provideApplicationScope(dispatchers: CoroutineDispatchers, logger: Logger): CoroutineScope {
+            val exceptionHandler = CoroutineExceptionHandler { _, throwable ->
+                logger.error(TAG, "Uncaught exception in the application scope", throwable)
+            }
+            return CoroutineScope(SupervisorJob() + dispatchers.default + exceptionHandler)
+        }
+    }
+}
