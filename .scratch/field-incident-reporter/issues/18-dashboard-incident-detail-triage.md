@@ -23,3 +23,7 @@ The `/incidents/[id]` page:
 - [ ] A Withdrawn incident is fully read-only.
 
 Refs: spec § 2, ADR-0004
+
+## Comments
+
+- Implemented on branch worktree-agent-a672c1bf8e15d2851; verified against the running server.
