@@ -58,4 +58,13 @@ function requireRole(...roles) {
   };
 }
 
-module.exports = { login, logout, requireAuth, requireRole, publicUser };
+/** Dispatches to the handler for the caller's role; 403 for a role without one. */
+function byRole(handlers) {
+  return (req, res, next) => {
+    const handler = handlers[req.user.role];
+    if (!handler) return sendError(res, 403, 'This route is not available to your role');
+    handler(req, res, next);
+  };
+}
+
+module.exports = { login, logout, requireAuth, requireRole, byRole, publicUser };

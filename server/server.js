@@ -9,6 +9,9 @@ const { errorHandler } = require('./src/errors');
 const { rejectDelete, routerGate } = require('./src/routing');
 const auth = require('./src/auth');
 const technicianIncidents = require('./src/technician-incidents');
+const operatorIncidents = require('./src/operator-incidents');
+
+const passToRouter = (req, res, next) => next();
 
 /** Builds the Express app over `dbFile` (which must exist) and `uploadsDir`. */
 function createApp({ dbFile = config.dbFile, logger = true } = {}) {
@@ -32,16 +35,20 @@ function createApp({ dbFile = config.dbFile, logger = true } = {}) {
 
   // Incidents
   const technician = auth.requireRole('technician');
+  const operator = auth.requireRole('operator');
   app.get('/incidents/summary', technician, technicianIncidents.summary(db));
   app.post('/incidents', technician, technicianIncidents.create(db));
-  app.get('/incidents/:id', technician, technicianIncidents.show(db));
-  app.patch('/incidents/:id', technician, technicianIncidents.update(db));
+  app.get('/incidents', operator, passToRouter);
+  app.get('/incidents/:id', auth.byRole({ technician: technicianIncidents.show(db), operator: operatorIncidents.show(db) }));
+  app.patch('/incidents/:id', auth.byRole({ technician: technicianIncidents.update(db), operator: operatorIncidents.update(db) }));
+  app.get('/users', operator, operatorIncidents.users(db));
 
-  // Catalog (any role) is served by json-server's router; nothing else is.
+  // Catalog (any role) and the operator's incident list are served by
+  // json-server's router; nothing else reaches it.
   app.use(
     routerGate({
-      routerGets: [/^\/(categories|severities|sites)\/?$/],
-      knownPaths: [/^\/(login|logout|categories|severities|sites|incidents)\/?$/, /^\/incidents\/[^/]+\/?$/],
+      routerGets: [/^\/(categories|severities|sites|incidents)\/?$/],
+      knownPaths: [/^\/(login|logout|categories|severities|sites|incidents|users)\/?$/, /^\/incidents\/[^/]+\/?$/],
     }),
   );
   app.use(router);
