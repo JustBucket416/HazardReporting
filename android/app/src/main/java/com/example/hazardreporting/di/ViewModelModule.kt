@@ -2,9 +2,11 @@ package com.example.hazardreporting.di
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
+import com.example.hazardreporting.presentation.MainViewModel
+import com.example.hazardreporting.presentation.login.LoginViewModel
 import dagger.Binds
 import dagger.Module
-import dagger.multibindings.Multibinds
+import dagger.multibindings.IntoMap
 
 /**
  * Binds the [ViewModelFactory] and every ViewModel into the map it creates them from
@@ -21,8 +23,18 @@ interface ViewModelModule {
     fun bindViewModelFactory(factory: ViewModelFactory): ViewModelProvider.Factory
 
     /**
-     * Declares the ViewModel map, so it can be injected even while it is empty
+     * Binds [MainViewModel] into the ViewModel map
      */
-    @Multibinds
-    fun viewModels(): Map<Class<out ViewModel>, ViewModel>
+    @Binds
+    @IntoMap
+    @ViewModelKey(MainViewModel::class)
+    fun bindMainViewModel(viewModel: MainViewModel): ViewModel
+
+    /**
+     * Binds [LoginViewModel] into the ViewModel map
+     */
+    @Binds
+    @IntoMap
+    @ViewModelKey(LoginViewModel::class)
+    fun bindLoginViewModel(viewModel: LoginViewModel): ViewModel
 }

@@ -1,3 +1,22 @@
 <resources>
     <string name="app_name">HazardReporting</string>
+
+    <!-- Shared -->
+    <string name="error_unexpected">Something went wrong</string>
+    <string name="placeholder_coming_soon">Coming soon</string>
+
+    <!-- Login -->
+    <string name="login_title">Sign in</string>
+    <string name="login_email">Email</string>
+    <string name="login_password">Password</string>
+    <string name="login_sign_in">Sign in</string>
+    <string name="login_signing_in">Signing in…</string>
+    <string name="login_error_invalid_credentials">Invalid email or password</string>
+    <string name="login_error_no_connection">No connection</string>
+
+    <!-- Incidents -->
+    <string name="incident_list_title">My incidents</string>
+    <string name="incident_detail_title">Incident</string>
+    <string name="incident_form_new_title">New report</string>
+    <string name="incident_form_edit_title">Edit report</string>
 </resources>
