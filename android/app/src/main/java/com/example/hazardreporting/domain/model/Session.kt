@@ -1,9 +1,9 @@
-package com.example.hazardreporting.data.session
-
-import com.example.hazardreporting.domain.model.User
+package com.example.hazardreporting.domain.model
 
 /**
- * The signed-in user together with the token that authorises their requests
+ * A session on the server: the signed-in user together with the token that authorises their requests.
+ * The domain sees it so that [com.example.hazardreporting.domain.interactor.LoginInteractor] can decide
+ * whether to keep a new session before anything is stored
  *
  * @property token bearer token sent with every request except login
  * @property user the signed-in user

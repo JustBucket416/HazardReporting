@@ -29,12 +29,12 @@ class SessionRemoteDataSource @Inject constructor(
         }
 
     /**
-     * Deletes the current session on the server
+     * Deletes the session with [token] on the server
      *
      * @throws com.example.hazardreporting.domain.exception.UnauthorizedException if the server doesn't know the session
      * @throws com.example.hazardreporting.domain.exception.NoConnectionException if the server can't be reached
      */
-    suspend fun logout() {
-        mapRemoteErrors { api.logout() }
+    suspend fun logout(token: String) {
+        mapRemoteErrors { api.logout(SessionApi.bearer(token)) }
     }
 }

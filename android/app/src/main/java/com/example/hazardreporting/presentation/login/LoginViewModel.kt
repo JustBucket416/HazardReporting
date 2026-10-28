@@ -1,8 +1,10 @@
 package com.example.hazardreporting.presentation.login
 
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.viewModelScope
 import com.example.hazardreporting.domain.exception.InvalidCredentialsException
 import com.example.hazardreporting.domain.exception.NoConnectionException
+import com.example.hazardreporting.domain.exception.NotTechnicianException
 import com.example.hazardreporting.domain.interactor.LoginInteractor
 import com.example.hazardreporting.presentation.common.BaseViewModel
 import com.example.hazardreporting.utils.CoroutineDispatchers
@@ -19,8 +21,10 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 /**
- * Manages the sign-in screen's state
+ * Manages the sign-in screen's state. The typed email survives process death in [savedStateHandle];
+ * the password deliberately doesn't
  *
+ * @property savedStateHandle keeps the typed email
  * @property loginInteractor used for signing in
  * @property dispatchers used for launching off the main thread
  * @param logger used for logging unexpected exceptions
@@ -28,12 +32,13 @@ import kotlinx.coroutines.launch
  * @author Roman Pliskin on 29.10.2026
  */
 class LoginViewModel @Inject constructor(
+    private val savedStateHandle: SavedStateHandle,
     private val loginInteractor: LoginInteractor,
     private val dispatchers: CoroutineDispatchers,
     logger: Logger,
 ) : BaseViewModel(logger) {
 
-    private val _uiState = MutableStateFlow(LoginUiState())
+    private val _uiState = MutableStateFlow(LoginUiState(email = savedStateHandle[KEY_EMAIL] ?: ""))
     private val _events = Channel<LoginEvent>(Channel.BUFFERED)
 
     /**
@@ -50,6 +55,7 @@ class LoginViewModel @Inject constructor(
      * Updates the email field and clears the previous error
      */
     fun onEmailChange(email: String) {
+        savedStateHandle[KEY_EMAIL] = email
         _uiState.update { it.copy(email = email, error = null) }
     }
 
@@ -75,6 +81,8 @@ class LoginViewModel @Inject constructor(
                 LoginError.InvalidCredentials
             } catch (e: NoConnectionException) {
                 LoginError.NoConnection
+            } catch (e: NotTechnicianException) {
+                LoginError.NotTechnician
             }
 
             if (error == null) {
@@ -89,5 +97,9 @@ class LoginViewModel @Inject constructor(
     override fun onUnexpected(throwable: Throwable) {
         _uiState.update { it.copy(isSigningIn = false) }
         _events.trySend(LoginEvent.UnexpectedError)
+    }
+
+    private companion object {
+        const val KEY_EMAIL = "email"
     }
 }

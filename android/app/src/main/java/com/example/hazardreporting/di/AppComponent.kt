@@ -22,7 +22,7 @@ import kotlinx.coroutines.CoroutineScope
         InteractorModule::class,
         NetworkModule::class,
         RepositoryModule::class,
-        ViewModelModule::class,
+        ViewModelFactoryModule::class,
     ]
 )
 interface AppComponent {

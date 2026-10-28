@@ -195,6 +195,7 @@ private fun LoginError.message(): String = stringResource(
     when (this) {
         LoginError.InvalidCredentials -> R.string.login_error_invalid_credentials
         LoginError.NoConnection -> R.string.login_error_no_connection
+        LoginError.NotTechnician -> R.string.login_error_not_technician
     }
 )
 

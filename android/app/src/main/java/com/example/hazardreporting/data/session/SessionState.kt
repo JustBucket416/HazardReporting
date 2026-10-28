@@ -1,5 +1,7 @@
 package com.example.hazardreporting.data.session
 
+import com.example.hazardreporting.domain.model.Session
+
 /**
  * What [SessionHolder] knows about the session. Telling "not loaded yet" apart from
  * "loaded, signed out" is what lets signed-out requests skip the blocking read (ADR-0010)

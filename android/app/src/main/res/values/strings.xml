@@ -13,6 +13,7 @@
     <string name="login_signing_in">Signing in…</string>
     <string name="login_error_invalid_credentials">Invalid email or password</string>
     <string name="login_error_no_connection">No connection</string>
+    <string name="login_error_not_technician">Technicians only</string>
 
     <!-- Incidents -->
     <string name="incident_list_title">My incidents</string>

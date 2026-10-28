@@ -6,7 +6,8 @@ import okhttp3.Response
 
 /**
  * Adds `Authorization: Bearer <token>` to every request while someone is signed in.
- * Login requests are sent as they are, without touching [SessionHolder]
+ * Login requests, and requests that already name a session in their `Authorization` header
+ * (e.g. closing a session that was never stored), are sent as they are, without touching [SessionHolder]
  *
  * @property sessionHolder provides the token
  *
@@ -19,16 +20,12 @@ class AuthInterceptor @Inject constructor(
     override fun intercept(chain: Interceptor.Chain): Response {
         val request = chain.request()
         if (request.url.pathSegments == listOf(SessionApi.LOGIN_PATH)) return chain.proceed(request)
+        if (request.header(SessionApi.AUTHORIZATION_HEADER) != null) return chain.proceed(request)
 
         val token = sessionHolder.sessionBlocking()?.token ?: return chain.proceed(request)
         val authorizedRequest = request.newBuilder()
-            .header(AUTHORIZATION_HEADER, "$BEARER_PREFIX$token")
+            .header(SessionApi.AUTHORIZATION_HEADER, SessionApi.bearer(token))
             .build()
         return chain.proceed(authorizedRequest)
-    }
-
-    private companion object {
-        const val AUTHORIZATION_HEADER = "Authorization"
-        const val BEARER_PREFIX = "Bearer "
     }
 }

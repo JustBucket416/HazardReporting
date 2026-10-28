@@ -1,5 +1,6 @@
 package com.example.hazardreporting.data.session
 
+import com.example.hazardreporting.domain.model.Session
 import com.example.hazardreporting.domain.model.User
 import com.example.hazardreporting.domain.model.UserRole
 import com.example.hazardreporting.utils.CoroutineDispatchers

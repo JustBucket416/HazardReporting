@@ -1,5 +1,6 @@
 package com.example.hazardreporting.data.session
 
+import com.example.hazardreporting.domain.model.Session
 import com.example.hazardreporting.utils.CoroutineDispatchers
 import javax.inject.Inject
 import javax.inject.Singleton

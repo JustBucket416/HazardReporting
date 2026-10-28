@@ -5,6 +5,7 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.stringPreferencesKey
+import com.example.hazardreporting.domain.model.Session
 import com.example.hazardreporting.domain.model.User
 import com.example.hazardreporting.domain.model.UserRole
 import java.io.IOException

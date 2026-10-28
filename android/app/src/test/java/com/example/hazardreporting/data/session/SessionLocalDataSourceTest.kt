@@ -1,6 +1,7 @@
 package com.example.hazardreporting.data.session
 
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
+import com.example.hazardreporting.domain.model.Session
 import com.example.hazardreporting.domain.model.User
 import com.example.hazardreporting.domain.model.UserRole
 import com.google.common.truth.Truth

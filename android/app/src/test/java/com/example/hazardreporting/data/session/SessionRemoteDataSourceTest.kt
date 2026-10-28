@@ -73,28 +73,29 @@ class SessionRemoteDataSourceTest {
 
     @Test
     fun testLogout_Success() = runTest {
-        coJustRun { api.logout() }
+        coJustRun { api.logout(AUTHORIZATION) }
 
-        dataSource.logout()
+        dataSource.logout(TOKEN)
 
-        coVerifySequence { api.logout() }
+        // The token is sent explicitly, so a session that was never stored can be closed
+        coVerifySequence { api.logout(AUTHORIZATION) }
     }
 
     @Test
     fun testLogout_Unauthorized() {
-        coEvery { api.logout() } throws httpException(401)
+        coEvery { api.logout(AUTHORIZATION) } throws httpException(401)
 
         Assert.assertThrows(UnauthorizedException::class.java) {
-            runTest { dataSource.logout() }
+            runTest { dataSource.logout(TOKEN) }
         }
     }
 
     @Test
     fun testLogout_NoConnection() {
-        coEvery { api.logout() } throws IOException()
+        coEvery { api.logout(AUTHORIZATION) } throws IOException()
 
         Assert.assertThrows(NoConnectionException::class.java) {
-            runTest { dataSource.logout() }
+            runTest { dataSource.logout(TOKEN) }
         }
     }
 
@@ -103,6 +104,8 @@ class SessionRemoteDataSourceTest {
     private companion object {
         const val EMAIL = "tech1@example.com"
         const val PASSWORD = "password"
+        const val TOKEN = "token"
+        const val AUTHORIZATION = "Bearer token"
         val LOGIN_REQUEST = LoginRequestDto(EMAIL, PASSWORD)
     }
 }

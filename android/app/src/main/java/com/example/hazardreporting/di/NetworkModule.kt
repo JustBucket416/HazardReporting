@@ -2,12 +2,15 @@ package com.example.hazardreporting.di
 
 import com.example.hazardreporting.BuildConfig
 import com.example.hazardreporting.data.catalog.CatalogApi
+import com.example.hazardreporting.data.remote.BaseUrl
 import com.example.hazardreporting.data.session.AuthInterceptor
 import com.example.hazardreporting.data.session.SessionApi
 import dagger.Module
 import dagger.Provides
 import javax.inject.Singleton
 import kotlinx.serialization.json.Json
+import okhttp3.HttpUrl
+import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
@@ -28,7 +31,6 @@ const val BASE_URL = "http://10.0.2.2:3001/"
 @Module
 object NetworkModule {
 
-    private const val AUTHORIZATION_HEADER = "Authorization"
     private const val JSON_MEDIA_TYPE = "application/json"
 
     /**
@@ -52,7 +54,7 @@ object NetworkModule {
         if (BuildConfig.DEBUG) {
             val loggingInterceptor = HttpLoggingInterceptor()
             loggingInterceptor.level = HttpLoggingInterceptor.Level.BODY
-            loggingInterceptor.redactHeader(AUTHORIZATION_HEADER)
+            loggingInterceptor.redactHeader(SessionApi.AUTHORIZATION_HEADER)
             builder.addInterceptor(loggingInterceptor)
         }
 
@@ -60,15 +62,24 @@ object NetworkModule {
     }
 
     /**
-     * Provides Retrofit for the server at [BASE_URL]
+     * Provides [BASE_URL] as the [BaseUrl] that Retrofit and the data layer's converters use
      */
     @Provides
     @Singleton
-    fun provideRetrofit(okHttpClient: OkHttpClient, json: Json): Retrofit = Retrofit.Builder()
-        .client(okHttpClient)
-        .addConverterFactory(json.asConverterFactory(JSON_MEDIA_TYPE.toMediaType()))
-        .baseUrl(BASE_URL)
-        .build()
+    @BaseUrl
+    fun provideBaseUrl(): HttpUrl = BASE_URL.toHttpUrl()
+
+    /**
+     * Provides Retrofit for the server at [baseUrl]
+     */
+    @Provides
+    @Singleton
+    fun provideRetrofit(okHttpClient: OkHttpClient, json: Json, @BaseUrl baseUrl: HttpUrl): Retrofit =
+        Retrofit.Builder()
+            .client(okHttpClient)
+            .addConverterFactory(json.asConverterFactory(JSON_MEDIA_TYPE.toMediaType()))
+            .baseUrl(baseUrl)
+            .build()
 
     /**
      * Provides the Retrofit interface for the session routes

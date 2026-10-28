@@ -33,4 +33,9 @@ enum class LoginError {
      * The server couldn't be reached
      */
     NoConnection,
+
+    /**
+     * The credentials belong to someone who isn't a technician
+     */
+    NotTechnician,
 }

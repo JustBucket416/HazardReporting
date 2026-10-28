@@ -1,8 +1,10 @@
 package com.example.hazardreporting.presentation.login
 
+import androidx.lifecycle.SavedStateHandle
 import app.cash.turbine.test
 import com.example.hazardreporting.domain.exception.InvalidCredentialsException
 import com.example.hazardreporting.domain.exception.NoConnectionException
+import com.example.hazardreporting.domain.exception.NotTechnicianException
 import com.example.hazardreporting.domain.interactor.LoginInteractor
 import com.example.hazardreporting.domain.model.User
 import com.example.hazardreporting.domain.model.UserRole
@@ -33,6 +35,7 @@ class LoginViewModelTest {
     @JvmField
     val rule = MainCoroutineRule()
 
+    private val savedStateHandle = SavedStateHandle()
     private val loginInteractor = mockk<LoginInteractor>()
     private val dispatchers = mockk<CoroutineDispatchers>()
     private val logger = mockk<Logger>()
@@ -43,7 +46,7 @@ class LoginViewModelTest {
     fun setUp() {
         every { dispatchers.default } returns rule.testDispatcher
 
-        viewModel = LoginViewModel(loginInteractor, dispatchers, logger)
+        viewModel = LoginViewModel(savedStateHandle, loginInteractor, dispatchers, logger)
         viewModel.onEmailChange(EMAIL)
         viewModel.onPasswordChange(PASSWORD)
     }
@@ -95,6 +98,20 @@ class LoginViewModelTest {
 
         Truth.assertThat(viewModel.uiState.value).isEqualTo(
             LoginUiState(email = EMAIL, password = PASSWORD, isSigningIn = false, error = LoginError.NoConnection)
+        )
+    }
+
+    @Test
+    fun testOnSubmit_NotTechnician() = runTest {
+        coEvery { loginInteractor.login(EMAIL, PASSWORD) } throws NotTechnicianException(UserRole.Operator)
+
+        viewModel.onSubmit()
+        advanceUntilIdle()
+
+        coVerifySequence { loginInteractor.login(EMAIL, PASSWORD) }
+
+        Truth.assertThat(viewModel.uiState.value).isEqualTo(
+            LoginUiState(email = EMAIL, password = PASSWORD, isSigningIn = false, error = LoginError.NotTechnician)
         )
     }
 
@@ -170,7 +187,26 @@ class LoginViewModelTest {
         )
     }
 
+    @Test
+    fun testOnEmailChange_SavesEmail() {
+        viewModel.onEmailChange(OTHER_EMAIL)
+
+        // The email survives process death; the password is never saved
+        Truth.assertThat(savedStateHandle.get<String>(KEY_EMAIL)).isEqualTo(OTHER_EMAIL)
+        Truth.assertThat(savedStateHandle.keys()).containsExactly(KEY_EMAIL)
+    }
+
+    @Test
+    fun testInit_RestoresEmail() {
+        val restoredViewModel = LoginViewModel(
+            SavedStateHandle(mapOf(KEY_EMAIL to OTHER_EMAIL)), loginInteractor, dispatchers, logger
+        )
+
+        Truth.assertThat(restoredViewModel.uiState.value).isEqualTo(LoginUiState(email = OTHER_EMAIL))
+    }
+
     private companion object {
+        const val KEY_EMAIL = "email"
         const val EMAIL = "tech1@example.com"
         const val PASSWORD = "password"
         const val OTHER_EMAIL = "tech2@example.com"

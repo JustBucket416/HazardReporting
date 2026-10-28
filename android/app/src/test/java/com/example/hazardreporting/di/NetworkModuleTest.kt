@@ -21,6 +21,15 @@ class NetworkModuleTest {
         )
     }
 
+    @Test
+    fun testProvideBaseUrl_ResolvesRelativeUrls() {
+        val baseUrl = NetworkModule.provideBaseUrl()
+
+        Truth.assertThat(baseUrl.toString()).isEqualTo(BASE_URL)
+        Truth.assertThat(baseUrl.resolve("/uploads/ab12.jpg").toString())
+            .isEqualTo("http://10.0.2.2:3001/uploads/ab12.jpg")
+    }
+
     private companion object {
         val LOGIN_RESPONSE = """
             {
