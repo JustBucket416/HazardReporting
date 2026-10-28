@@ -17,3 +17,7 @@ Blocked by: 01
 - [ ] After the server is reset (`npm run reset`), the next navigation redirects to login.
 
 Refs: spec § 2
+
+## Comments
+
+- Implemented on branch worktree-agent-a672c1bf8e15d2851; verified against the running server.
