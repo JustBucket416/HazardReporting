@@ -2,12 +2,14 @@ package com.example.hazardreporting.presentation.login
 
 import android.content.res.Configuration
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -109,48 +111,66 @@ fun LoginScreen(
         modifier = modifier,
         snackbarHost = { SnackbarHost(snackbarHostState) },
     ) { innerPadding ->
-        Column(
+        // The box centres the form; the form scrolls once the keyboard leaves too little room for it
+        Box(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
                 .consumeWindowInsets(innerPadding)
-                .imePadding()
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 24.dp, vertical = 32.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterVertically),
+                .imePadding(),
+            contentAlignment = Alignment.Center,
         ) {
-            Text(
-                text = stringResource(R.string.login_title),
-                style = MaterialTheme.typography.headlineMedium,
-            )
-            OutlinedTextField(
-                value = uiState.email,
-                onValueChange = onEmailChange,
-                modifier = Modifier.fillMaxWidth(),
-                enabled = !uiState.isSigningIn,
-                label = { Text(stringResource(R.string.login_email)) },
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email, imeAction = ImeAction.Next),
-                singleLine = true,
-            )
-            OutlinedTextField(
-                value = uiState.password,
-                onValueChange = onPasswordChange,
-                modifier = Modifier.fillMaxWidth(),
-                enabled = !uiState.isSigningIn,
-                label = { Text(stringResource(R.string.login_password)) },
-                supportingText = if (uiState.error != null) {
-                    { Text(uiState.error.message()) }
-                } else {
-                    null
-                },
-                isError = uiState.error != null,
-                visualTransformation = PasswordVisualTransformation(),
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Go),
-                keyboardActions = KeyboardActions(onGo = { submit() }),
-                singleLine = true,
-            )
-            SignInButton(isSigningIn = uiState.isSigningIn, onClick = submit)
+            LoginForm(uiState, onEmailChange, onPasswordChange, submit)
         }
+    }
+}
+
+@Composable
+private fun LoginForm(
+    uiState: LoginUiState,
+    onEmailChange: (String) -> Unit,
+    onPasswordChange: (String) -> Unit,
+    onSubmit: () -> Unit,
+) {
+    Column(
+        modifier = Modifier
+            .widthIn(max = FORM_MAX_WIDTH)
+            .fillMaxWidth()
+            .verticalScroll(rememberScrollState())
+            .padding(horizontal = 24.dp, vertical = 32.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+    ) {
+        Text(
+            text = stringResource(R.string.login_title),
+            style = MaterialTheme.typography.headlineMedium,
+        )
+        OutlinedTextField(
+            value = uiState.email,
+            onValueChange = onEmailChange,
+            modifier = Modifier.fillMaxWidth(),
+            enabled = !uiState.isSigningIn,
+            label = { Text(stringResource(R.string.login_email)) },
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email, imeAction = ImeAction.Next),
+            singleLine = true,
+        )
+        OutlinedTextField(
+            value = uiState.password,
+            onValueChange = onPasswordChange,
+            modifier = Modifier.fillMaxWidth(),
+            enabled = !uiState.isSigningIn,
+            label = { Text(stringResource(R.string.login_password)) },
+            supportingText = if (uiState.error != null) {
+                { Text(uiState.error.message()) }
+            } else {
+                null
+            },
+            isError = uiState.error != null,
+            visualTransformation = PasswordVisualTransformation(),
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Go),
+            keyboardActions = KeyboardActions(onGo = { onSubmit() }),
+            singleLine = true,
+        )
+        SignInButton(isSigningIn = uiState.isSigningIn, onClick = onSubmit)
     }
 }
 
@@ -179,6 +199,7 @@ private fun LoginError.message(): String = stringResource(
 )
 
 private const val SIGNING_IN_HIGHLIGHT_ALPHA = 0.35f
+private val FORM_MAX_WIDTH = 480.dp
 
 @Preview(name = "Light")
 @Preview(name = "Dark", uiMode = Configuration.UI_MODE_NIGHT_YES)
