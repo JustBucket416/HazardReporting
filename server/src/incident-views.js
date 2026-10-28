@@ -7,8 +7,8 @@ function technicianView(incident) {
 }
 
 /** Incident Summary, as listed by GET /incidents/summary. */
-function summaryView({ id, title, categoryId, severityId, status, createdAt, updatedAt }) {
-  return { id, title, categoryId, severityId, status, createdAt, updatedAt };
+function summaryView({ id, title, categoryId, severityId, siteId, status, createdAt, updatedAt }) {
+  return { id, title, categoryId, severityId, siteId, status, createdAt, updatedAt };
 }
 
 module.exports = { technicianView, summaryView };

@@ -59,7 +59,7 @@ describe('GET /incidents/summary', () => {
   test('items carry exactly the summary fields', async () => {
     const res = await srv.request('GET', '/incidents/summary', { token: tech1 });
     for (const item of res.body) {
-      assert.deepEqual(Object.keys(item).sort(), ['categoryId', 'createdAt', 'id', 'severityId', 'status', 'title', 'updatedAt']);
+      assert.deepEqual(Object.keys(item).sort(), ['categoryId', 'createdAt', 'id', 'severityId', 'siteId', 'status', 'title', 'updatedAt']);
     }
   });
 

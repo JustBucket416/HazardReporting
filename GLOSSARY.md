@@ -27,7 +27,7 @@ To submit a new incident.
 _Avoid_: Create, file, raise
 
 **Incident Summary**:
-The short form of an incident a technician sees in their list: title, category, severity, status and when it was reported.
+The short form of an incident a technician sees in their list: title, category, severity, site, status and when it was reported.
 _Avoid_: Preview, list item
 
 **Incident Details**:
