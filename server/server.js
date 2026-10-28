@@ -8,6 +8,7 @@ const { ensureDbFile, reloadDbFromDisk } = require('./src/data-files');
 const { errorHandler } = require('./src/errors');
 const { rejectDelete, routerGate } = require('./src/routing');
 const auth = require('./src/auth');
+const technicianIncidents = require('./src/technician-incidents');
 
 /** Builds the Express app over `dbFile` (which must exist) and `uploadsDir`. */
 function createApp({ dbFile = config.dbFile, logger = true } = {}) {
@@ -29,11 +30,18 @@ function createApp({ dbFile = config.dbFile, logger = true } = {}) {
   app.use(auth.requireAuth(db));
   app.post('/logout', auth.logout(db));
 
+  // Incidents
+  const technician = auth.requireRole('technician');
+  app.get('/incidents/summary', technician, technicianIncidents.summary(db));
+  app.post('/incidents', technician, technicianIncidents.create(db));
+  app.get('/incidents/:id', technician, technicianIncidents.show(db));
+  app.patch('/incidents/:id', technician, technicianIncidents.update(db));
+
   // Catalog (any role) is served by json-server's router; nothing else is.
   app.use(
     routerGate({
       routerGets: [/^\/(categories|severities|sites)\/?$/],
-      knownPaths: [/^\/(login|logout|categories|severities|sites)\/?$/],
+      knownPaths: [/^\/(login|logout|categories|severities|sites|incidents)\/?$/, /^\/incidents\/[^/]+\/?$/],
     }),
   );
   app.use(router);

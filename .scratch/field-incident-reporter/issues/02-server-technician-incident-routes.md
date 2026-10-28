@@ -22,3 +22,7 @@ Technician side of `incidents`, per spec § 1 "Technician routes":
 - [ ] The technician view never contains `assignee` or `notes`.
 
 Refs: ADR-0003, ADR-0004, ADR-0005
+
+## Comments
+
+- Implemented on branch worktree-agent-a3e3d6de7f949a127; verified by npm test.
