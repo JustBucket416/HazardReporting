@@ -2,6 +2,7 @@ package com.example.hazardreporting.di
 
 import android.content.Context
 import androidx.lifecycle.ViewModelProvider
+import com.example.hazardreporting.data.session.SessionHolder
 import dagger.BindsInstance
 import dagger.Component
 import javax.inject.Singleton
@@ -16,7 +17,9 @@ import kotlinx.coroutines.CoroutineScope
 @Component(
     modules = [
         AppModule::class,
+        DataStoreModule::class,
         InteractorModule::class,
+        NetworkModule::class,
         RepositoryModule::class,
         ViewModelModule::class,
     ]
@@ -28,6 +31,11 @@ interface AppComponent {
      */
     @ApplicationScope
     fun applicationScope(): CoroutineScope
+
+    /**
+     * Returns the holder of the in-memory session, so the application can load it at startup
+     */
+    fun sessionHolder(): SessionHolder
 
     /**
      * Returns the factory that creates every ViewModel
