@@ -54,6 +54,14 @@ class SessionRepositoryImpl @Inject constructor(
         sessionHolder.session()?.user
     }
 
+    override suspend fun currentSession(): Session? = withContext(dispatchers.io) {
+        sessionHolder.session()
+    }
+
+    override suspend fun clearSession() {
+        withContext(dispatchers.io) { sessionHolder.clear() }
+    }
+
     override fun observeSessionInvalid(): Flow<Boolean> = sessionHolder.isRejected
 
     override fun markSessionInvalid() {

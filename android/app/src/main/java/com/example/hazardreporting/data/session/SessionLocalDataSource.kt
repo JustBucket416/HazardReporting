@@ -56,6 +56,13 @@ class SessionLocalDataSource @Inject constructor(
         }
     }
 
+    /**
+     * Deletes the stored session
+     */
+    suspend fun clear() {
+        dataStore.edit { it.clear() }
+    }
+
     private companion object {
         val TOKEN = stringPreferencesKey("token")
         val USER_ID = stringPreferencesKey("user_id")

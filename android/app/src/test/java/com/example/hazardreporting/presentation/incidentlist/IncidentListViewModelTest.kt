@@ -11,6 +11,7 @@ import com.example.hazardreporting.domain.interactor.LoginInteractor
 import com.example.hazardreporting.domain.model.Category
 import com.example.hazardreporting.domain.model.IncidentStatus
 import com.example.hazardreporting.domain.model.IncidentSummary
+import com.example.hazardreporting.domain.model.LogoutResult
 import com.example.hazardreporting.domain.model.Severity
 import com.example.hazardreporting.domain.model.Site
 import com.example.hazardreporting.domain.model.SyncState
@@ -22,6 +23,7 @@ import com.google.common.truth.Truth
 import io.mockk.coEvery
 import io.mockk.coJustRun
 import io.mockk.coVerify
+import io.mockk.coVerifyOrder
 import io.mockk.every
 import io.mockk.justRun
 import io.mockk.mockk
@@ -353,6 +355,180 @@ class IncidentListViewModelTest {
         Truth.assertThat(viewModel.uiState.value).isEqualTo(
             IncidentListUiState(IncidentListContent.Incidents(listOf(ITEM)), isRefreshing = false)
         )
+    }
+
+    @Test
+    fun testLogoutDialog_Dismissed() = runTest {
+        val viewModel = createViewModel(refreshOnOpen = false)
+        collectUiState(viewModel)
+
+        viewModel.onLogoutClick()
+        advanceUntilIdle()
+
+        // "Log out? Data on this device will be removed."
+        Truth.assertThat(viewModel.uiState.value.logoutDialog).isEqualTo(LogoutDialog.Confirm)
+
+        viewModel.onLogoutDismiss()
+        advanceUntilIdle()
+
+        Truth.assertThat(viewModel.uiState.value.logoutDialog).isNull()
+        coVerify(exactly = 0) { loginInteractor.logout(any()) }
+    }
+
+    @Test
+    fun testOnLogoutConfirm_EverythingSent() = runTest {
+        val logout = CompletableDeferred<LogoutResult>()
+
+        coEvery { loginInteractor.countPendingChanges() } returns 2
+        coEvery { loginInteractor.logout(force = false) } coAnswers { logout.await() }
+
+        val viewModel = createViewModel(refreshOnOpen = false)
+        collectUiState(viewModel)
+
+        viewModel.events.test {
+            viewModel.onLogoutClick()
+            viewModel.onLogoutConfirm()
+            advanceUntilIdle()
+
+            // The spinner, while the pending reports are sent
+            Truth.assertThat(viewModel.uiState.value.logoutDialog).isEqualTo(LogoutDialog.Sending(pendingCount = 2))
+
+            // Can't be cancelled meanwhile
+            viewModel.onLogoutDismiss()
+            advanceUntilIdle()
+            Truth.assertThat(viewModel.uiState.value.logoutDialog).isEqualTo(LogoutDialog.Sending(pendingCount = 2))
+
+            logout.complete(LogoutResult.LoggedOut)
+            advanceUntilIdle()
+
+            Truth.assertThat(awaitItem()).isEqualTo(IncidentListEvent.LoggedOut)
+        }
+    }
+
+    @Test
+    fun testOnLogoutConfirm_NothingPending() = runTest {
+        val logout = CompletableDeferred<LogoutResult>()
+
+        coEvery { loginInteractor.countPendingChanges() } returns 0
+        coEvery { loginInteractor.logout(force = false) } coAnswers { logout.await() }
+
+        val viewModel = createViewModel(refreshOnOpen = false)
+        collectUiState(viewModel)
+
+        viewModel.onLogoutClick()
+        viewModel.onLogoutConfirm()
+        advanceUntilIdle()
+
+        Truth.assertThat(viewModel.uiState.value.logoutDialog).isEqualTo(LogoutDialog.Sending(pendingCount = 0))
+        logout.complete(LogoutResult.LoggedOut)
+    }
+
+    @Test
+    fun testOnLogoutConfirm_PendingChangesRemain() = runTest {
+        coEvery { loginInteractor.countPendingChanges() } returns 1
+        coEvery { loginInteractor.logout(force = false) } returns LogoutResult.PendingChangesRemain(1)
+
+        val viewModel = createViewModel(refreshOnOpen = false)
+        collectUiState(viewModel)
+
+        viewModel.events.test {
+            viewModel.onLogoutClick()
+            viewModel.onLogoutConfirm()
+            advanceUntilIdle()
+
+            // "1 report couldn't be sent and will be lost"; nothing happens until the technician decides
+            expectNoEvents()
+        }
+        Truth.assertThat(viewModel.uiState.value.logoutDialog).isEqualTo(LogoutDialog.Unsent(pendingCount = 1))
+    }
+
+    @Test
+    fun testOnLogoutAnyway() = runTest {
+        coEvery { loginInteractor.countPendingChanges() } returns 1
+        coEvery { loginInteractor.logout(force = false) } returns LogoutResult.PendingChangesRemain(1)
+        coEvery { loginInteractor.logout(force = true) } returns LogoutResult.LoggedOut
+
+        val viewModel = createViewModel(refreshOnOpen = false)
+        collectUiState(viewModel)
+
+        viewModel.events.test {
+            viewModel.onLogoutClick()
+            viewModel.onLogoutConfirm()
+            advanceUntilIdle()
+            viewModel.onLogoutAnyway()
+            advanceUntilIdle()
+
+            Truth.assertThat(awaitItem()).isEqualTo(IncidentListEvent.LoggedOut)
+        }
+        coVerifyOrder {
+            loginInteractor.logout(force = false)
+            loginInteractor.logout(force = true)
+        }
+    }
+
+    @Test
+    fun testOnLogoutCancelAfterWarning() = runTest {
+        coEvery { loginInteractor.countPendingChanges() } returns 1
+        coEvery { loginInteractor.logout(force = false) } returns LogoutResult.PendingChangesRemain(1)
+
+        val viewModel = createViewModel(refreshOnOpen = false)
+        collectUiState(viewModel)
+
+        viewModel.onLogoutClick()
+        viewModel.onLogoutConfirm()
+        advanceUntilIdle()
+        viewModel.onLogoutDismiss()
+        advanceUntilIdle()
+
+        // Everything stays
+        Truth.assertThat(viewModel.uiState.value.logoutDialog).isNull()
+        coVerify(exactly = 0) { loginInteractor.logout(force = true) }
+    }
+
+    @Test
+    fun testOnLogoutConfirm_Twice() = runTest {
+        val logout = CompletableDeferred<LogoutResult>()
+
+        coEvery { loginInteractor.countPendingChanges() } returns 0
+        coEvery { loginInteractor.logout(any()) } coAnswers { logout.await() }
+
+        val viewModel = createViewModel(refreshOnOpen = false)
+        viewModel.onLogoutClick()
+        viewModel.onLogoutConfirm()
+        viewModel.onLogoutConfirm()
+        viewModel.onLogoutAnyway()
+        logout.complete(LogoutResult.LoggedOut)
+        advanceUntilIdle()
+
+        coVerify(exactly = 1) { loginInteractor.logout(any()) }
+    }
+
+    @Test
+    fun testOnLogoutConfirm_UnexpectedException() = runTest {
+        val exception = IllegalStateException()
+
+        coEvery { loginInteractor.countPendingChanges() } returns 0
+        coEvery { loginInteractor.logout(force = false) } throws exception
+        justRun { logger.error(any(), any(), exception) }
+
+        val viewModel = createViewModel(refreshOnOpen = false)
+        collectUiState(viewModel)
+
+        viewModel.events.test {
+            viewModel.onLogoutClick()
+            viewModel.onLogoutConfirm()
+            advanceUntilIdle()
+
+            Truth.assertThat(awaitItem()).isEqualTo(IncidentListEvent.UnexpectedError)
+        }
+
+        // The spinner goes, and signing out can be tried again
+        Truth.assertThat(viewModel.uiState.value.logoutDialog).isNull()
+        coEvery { loginInteractor.logout(force = false) } returns LogoutResult.LoggedOut
+        viewModel.onLogoutClick()
+        viewModel.onLogoutConfirm()
+        advanceUntilIdle()
+        coVerify(exactly = 2) { loginInteractor.logout(force = false) }
     }
 
     private fun createViewModel(

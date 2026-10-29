@@ -20,34 +20,45 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.hazardreporting.R
 import com.example.hazardreporting.domain.model.IncidentStatus
@@ -68,6 +79,7 @@ import kotlinx.coroutines.launch
  * @param onReportSavedShown called once the "saved" result is consumed, so it isn't shown again
  * @param onIncidentClick called with the local id of the tapped incident
  * @param onReportClick called when the user taps "Report incident"
+ * @param onLoggedOut called once the technician signed out and the device was wiped
  *
  * @author Roman Pliskin on 29.10.2026
  */
@@ -78,6 +90,7 @@ fun IncidentListRoute(
     onReportSavedShown: () -> Unit,
     onIncidentClick: (Long) -> Unit,
     onReportClick: () -> Unit,
+    onLoggedOut: () -> Unit,
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
@@ -87,11 +100,15 @@ fun IncidentListRoute(
     val reportSavedMessage = stringResource(R.string.incident_list_report_saved)
 
     CollectEvents(viewModel.events) { event ->
-        val message = when (event) {
-            IncidentListEvent.RefreshFailed -> refreshFailedMessage
-            IncidentListEvent.UnexpectedError -> unexpectedErrorMessage
+        when (event) {
+            IncidentListEvent.RefreshFailed -> coroutineScope.launch {
+                snackbarHostState.showSnackbar(refreshFailedMessage)
+            }
+            IncidentListEvent.UnexpectedError -> coroutineScope.launch {
+                snackbarHostState.showSnackbar(unexpectedErrorMessage)
+            }
+            IncidentListEvent.LoggedOut -> onLoggedOut()
         }
-        coroutineScope.launch { snackbarHostState.showSnackbar(message) }
     }
 
     LaunchedEffect(reportSaved) {
@@ -105,24 +122,53 @@ fun IncidentListRoute(
     IncidentListScreen(
         uiState = uiState,
         snackbarHostState = snackbarHostState,
-        onRefresh = viewModel::onRefresh,
-        onRetry = viewModel::onRetry,
-        onIncidentClick = onIncidentClick,
-        onReportClick = onReportClick,
+        actions = IncidentListActions(
+            onRefresh = viewModel::onRefresh,
+            onRetry = viewModel::onRetry,
+            onIncidentClick = onIncidentClick,
+            onReportClick = onReportClick,
+            onLogoutClick = viewModel::onLogoutClick,
+            onLogoutConfirm = viewModel::onLogoutConfirm,
+            onLogoutAnyway = viewModel::onLogoutAnyway,
+            onLogoutDismiss = viewModel::onLogoutDismiss,
+        ),
     )
 }
 
 /**
+ * What the incident list's controls do
+ *
+ * @property onRefresh called on a pull-to-refresh
+ * @property onRetry called when the user taps Retry on the error card
+ * @property onIncidentClick called with the local id of the tapped incident
+ * @property onReportClick called when the user taps "Report incident"
+ * @property onLogoutClick called when the user picks Log out in the ⋮ menu
+ * @property onLogoutConfirm called when the user confirms signing out
+ * @property onLogoutAnyway called when the user signs out although pending changes will be lost
+ * @property onLogoutDismiss called when the user cancels signing out
+ *
+ * @author Roman Pliskin on 29.10.2026
+ */
+data class IncidentListActions(
+    val onRefresh: () -> Unit,
+    val onRetry: () -> Unit,
+    val onIncidentClick: (Long) -> Unit,
+    val onReportClick: () -> Unit,
+    val onLogoutClick: () -> Unit,
+    val onLogoutConfirm: () -> Unit,
+    val onLogoutAnyway: () -> Unit,
+    val onLogoutDismiss: () -> Unit,
+)
+
+/**
  * The technician's incidents, newest first, with pull-to-refresh and a "Report incident" button that
  * collapses to its icon while the list scrolls. Shows skeleton rows during the first load, an empty state,
- * or an error card with Retry when nothing is stored, and a persistent banner while the session is invalid
+ * or an error card with Retry when nothing is stored, and a persistent banner while the session is invalid.
+ * The ⋮ menu signs out through the logout dialog
  *
  * @param uiState state of the screen
  * @param snackbarHostState shows the screen's snackbars
- * @param onRefresh called on a pull-to-refresh
- * @param onRetry called when the user taps Retry on the error card
- * @param onIncidentClick called with the local id of the tapped incident
- * @param onReportClick called when the user taps "Report incident"
+ * @param actions what the screen's controls do
  * @param modifier modifier for the screen's root
  *
  * @author Roman Pliskin on 29.10.2026
@@ -132,22 +178,24 @@ fun IncidentListRoute(
 fun IncidentListScreen(
     uiState: IncidentListUiState,
     snackbarHostState: SnackbarHostState,
-    onRefresh: () -> Unit,
-    onRetry: () -> Unit,
-    onIncidentClick: (Long) -> Unit,
-    onReportClick: () -> Unit,
+    actions: IncidentListActions,
     modifier: Modifier = Modifier,
 ) {
     val listState = rememberLazyListState()
 
     Scaffold(
         modifier = modifier,
-        topBar = { TopAppBar(title = { Text(stringResource(R.string.incident_list_title)) }) },
+        topBar = {
+            TopAppBar(
+                title = { Text(stringResource(R.string.incident_list_title)) },
+                actions = { ListMenu(actions.onLogoutClick) },
+            )
+        },
         floatingActionButton = {
             ExtendedFloatingActionButton(
                 text = { Text(stringResource(R.string.incident_list_report)) },
                 icon = { Icon(painterResource(R.drawable.ic_add), contentDescription = null) },
-                onClick = onReportClick,
+                onClick = actions.onReportClick,
                 expanded = !listState.isScrollInProgress,
             )
         },
@@ -159,36 +207,95 @@ fun IncidentListScreen(
                 .padding(innerPadding),
         ) {
             if (uiState.isSessionInvalid) SessionInvalidBanner()
-            IncidentListBody(uiState, listState, onRefresh, onRetry, onIncidentClick)
+            IncidentListBody(uiState, listState, actions)
+        }
+    }
+
+    uiState.logoutDialog?.let { LogoutAlert(it, actions) }
+}
+
+@Composable
+private fun ListMenu(onLogoutClick: () -> Unit) {
+    var isExpanded by rememberSaveable { mutableStateOf(false) }
+    Box {
+        IconButton(onClick = { isExpanded = true }) {
+            Icon(painterResource(R.drawable.ic_more_vert), stringResource(R.string.action_more_options))
+        }
+        DropdownMenu(expanded = isExpanded, onDismissRequest = { isExpanded = false }) {
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.action_log_out)) },
+                onClick = {
+                    isExpanded = false
+                    onLogoutClick()
+                },
+            )
         }
     }
 }
 
+@Composable
+private fun LogoutAlert(dialog: LogoutDialog, actions: IncidentListActions) {
+    val isSending = dialog is LogoutDialog.Sending
+    AlertDialog(
+        onDismissRequest = actions.onLogoutDismiss,
+        // While sending, neither Back nor a tap outside closes it
+        properties = DialogProperties(dismissOnBackPress = !isSending, dismissOnClickOutside = !isSending),
+        title = { Text(stringResource(R.string.logout_title)) },
+        text = {
+            when (dialog) {
+                LogoutDialog.Confirm -> Text(stringResource(R.string.logout_confirm_text))
+                is LogoutDialog.Sending -> Row(
+                    horizontalArrangement = Arrangement.spacedBy(16.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    CircularProgressIndicator(modifier = Modifier.size(LOGOUT_SPINNER_SIZE))
+                    Text(
+                        if (dialog.pendingCount > 0) {
+                            pluralStringResource(R.plurals.logout_sending, dialog.pendingCount, dialog.pendingCount)
+                        } else {
+                            stringResource(R.string.logout_signing_out)
+                        }
+                    )
+                }
+                is LogoutDialog.Unsent -> Text(
+                    pluralStringResource(R.plurals.logout_unsent, dialog.pendingCount, dialog.pendingCount)
+                )
+            }
+        },
+        confirmButton = {
+            val (label, onClick) = when (dialog) {
+                is LogoutDialog.Unsent -> R.string.logout_anyway to actions.onLogoutAnyway
+                else -> R.string.action_log_out to actions.onLogoutConfirm
+            }
+            TextButton(onClick = onClick, enabled = !isSending) { Text(stringResource(label)) }
+        },
+        dismissButton = {
+            TextButton(onClick = actions.onLogoutDismiss, enabled = !isSending) {
+                Text(stringResource(R.string.action_cancel))
+            }
+        },
+    )
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun IncidentListBody(
-    uiState: IncidentListUiState,
-    listState: LazyListState,
-    onRefresh: () -> Unit,
-    onRetry: () -> Unit,
-    onIncidentClick: (Long) -> Unit,
-) {
+private fun IncidentListBody(uiState: IncidentListUiState, listState: LazyListState, actions: IncidentListActions) {
     PullToRefreshBox(
         isRefreshing = uiState.isRefreshing,
-        onRefresh = onRefresh,
+        onRefresh = actions.onRefresh,
         modifier = Modifier.fillMaxSize(),
     ) {
         when (val content = uiState.content) {
             IncidentListContent.Loading -> SkeletonRows()
             IncidentListContent.Empty -> EmptyState()
-            IncidentListContent.Error -> ErrorCard(onRetry)
+            IncidentListContent.Error -> ErrorCard(actions.onRetry)
             is IncidentListContent.Incidents -> LazyColumn(
                 state = listState,
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(bottom = FAB_CLEARANCE),
             ) {
                 items(content.items, key = { it.localId }) { item ->
-                    IncidentRow(item, onClick = { onIncidentClick(item.localId) })
+                    IncidentRow(item, onClick = { actions.onIncidentClick(item.localId) })
                     HorizontalDivider()
                 }
             }
@@ -371,6 +478,7 @@ private fun CenteredScrollableBox(content: @Composable () -> Unit) {
 private const val SKELETON_ROW_COUNT = 6
 private val ROW_ICON_SIZE = 18.dp
 private val FAB_CLEARANCE = 88.dp
+private val LOGOUT_SPINNER_SIZE = 24.dp
 
 @Preview(name = "Incidents, light")
 @Preview(name = "Incidents, dark", uiMode = Configuration.UI_MODE_NIGHT_YES)
@@ -416,6 +524,22 @@ private fun IncidentListScreenSessionInvalidPreview() {
     )
 }
 
+@Preview(name = "Logging out")
+@Composable
+private fun IncidentListScreenSendingPreview() {
+    IncidentListScreenPreviewContent(
+        IncidentListUiState(content = IncidentListContent.Empty, logoutDialog = LogoutDialog.Sending(pendingCount = 2))
+    )
+}
+
+@Preview(name = "Unsent reports")
+@Composable
+private fun IncidentListScreenUnsentPreview() {
+    IncidentListScreenPreviewContent(
+        IncidentListUiState(content = IncidentListContent.Empty, logoutDialog = LogoutDialog.Unsent(pendingCount = 1))
+    )
+}
+
 @Preview(name = "Loading")
 @Composable
 private fun IncidentListScreenLoadingPreview() {
@@ -440,10 +564,16 @@ private fun IncidentListScreenPreviewContent(uiState: IncidentListUiState) {
         IncidentListScreen(
             uiState = uiState,
             snackbarHostState = remember { SnackbarHostState() },
-            onRefresh = {},
-            onRetry = {},
-            onIncidentClick = {},
-            onReportClick = {},
+            actions = IncidentListActions(
+                onRefresh = {},
+                onRetry = {},
+                onIncidentClick = {},
+                onReportClick = {},
+                onLogoutClick = {},
+                onLogoutConfirm = {},
+                onLogoutAnyway = {},
+                onLogoutDismiss = {},
+            ),
         )
     }
 }

@@ -692,6 +692,18 @@ class IncidentSynchronizerTest {
     }
 
     @Test
+    fun testCountUnsentChanges() = runTest {
+        storeIncident(report(1))
+        storeIncident(edited(synced(2, "inc-2"), title = "Edit"))
+        storeIncident(withdrawn(synced(3, "inc-3")))
+        storeIncident(synced(4, "inc-4"))
+        // Needs no request, so nothing is lost if it never happens
+        storeIncident(report(5).copy(syncState = SyncState.PendingWithdraw))
+
+        Truth.assertThat(synchronizer.countUnsentChanges()).isEqualTo(3)
+    }
+
+    @Test
     fun testPush_WaitsForSyncLock() = runTest {
         storeIncident(report(1), remote = REMOTE_A)
         val pull = CompletableDeferred<Unit>()

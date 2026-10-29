@@ -91,6 +91,13 @@ class PhotoLocalDataSource @Inject constructor(
     }
 
     /**
+     * Deletes the photo directory with every file in it
+     */
+    fun deleteAllPhotos() {
+        photosDirectory.deleteRecursively()
+    }
+
+    /**
      * Deletes the photo file at [path]. A path outside the photo directory is left alone
      */
     fun deletePhoto(path: String) {

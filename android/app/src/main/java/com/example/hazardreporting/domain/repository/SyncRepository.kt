@@ -18,4 +18,16 @@ interface SyncRepository {
      * which is then marked as invalid
      */
     suspend fun push()
+
+    /**
+     * Returns how many incidents have a pending change a push would still send. A withdrawal of a report that
+     * was never sent doesn't count: it needs no request, so nothing is lost if it never happens
+     */
+    suspend fun countPendingChanges(): Int
+
+    /**
+     * Runs [block] while no push or pull can run, waiting first for one in progress to finish.
+     * [block] must not push or pull itself
+     */
+    suspend fun <T> withSyncPaused(block: suspend () -> T): T
 }

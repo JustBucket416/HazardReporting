@@ -47,6 +47,11 @@ class SyncSchedulerImpl @Inject constructor(
         workManager.enqueueUniquePeriodicWork(SYNC_PERIODIC, ExistingPeriodicWorkPolicy.KEEP, request)
     }
 
+    override fun cancelScheduledPushes() {
+        // The app's only work is sync; a running push is stopped at its next suspension point
+        workManager.cancelAllWork()
+    }
+
     /**
      * Names and timing of the sync work
      */

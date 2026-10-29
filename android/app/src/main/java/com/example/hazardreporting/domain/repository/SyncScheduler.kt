@@ -19,4 +19,9 @@ interface SyncScheduler {
      * push gave up. Returns at once; calling it again keeps the existing schedule
      */
     fun schedulePeriodicPush()
+
+    /**
+     * Cancels every scheduled push, the periodic one included, and stops one that is running
+     */
+    fun cancelScheduledPushes()
 }

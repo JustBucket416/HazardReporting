@@ -50,6 +50,16 @@ class SessionLocalDataSourceTest {
         Truth.assertThat(dataSource.read()).isEqualTo(newSession)
     }
 
+    @Test
+    fun testClear() = runTest {
+        val dataSource = createDataSource()
+
+        dataSource.write(SESSION)
+        dataSource.clear()
+
+        Truth.assertThat(dataSource.read()).isNull()
+    }
+
     private fun TestScope.createDataSource(): SessionLocalDataSource {
         val dataStore = PreferenceDataStoreFactory.create(
             scope = backgroundScope,

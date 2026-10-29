@@ -37,6 +37,17 @@ interface SessionRepository {
     suspend fun currentUser(): User?
 
     /**
+     * Returns the signed-in session, or null if nobody is signed in
+     */
+    suspend fun currentSession(): Session?
+
+    /**
+     * Forgets the signed-in session on the device, so nobody is signed in. Doesn't tell the server;
+     * [closeSession] does that
+     */
+    suspend fun clearSession()
+
+    /**
      * Observes whether the server rejected the signed-in session, e.g. after it was reset. A rejected session
      * stays signed in (ADR-0007); signing in again replaces it
      */

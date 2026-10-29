@@ -162,6 +162,22 @@ class SessionRepositoryImplTest {
     }
 
     @Test
+    fun testCurrentSession() = runTest {
+        coEvery { sessionHolder.session() } returns SESSION
+
+        Truth.assertThat(repository.currentSession()).isEqualTo(SESSION)
+    }
+
+    @Test
+    fun testClearSession() = runTest {
+        coJustRun { sessionHolder.clear() }
+
+        repository.clearSession()
+
+        coVerifySequence { sessionHolder.clear() }
+    }
+
+    @Test
     fun testObserveSessionInvalid() {
         val isRejected = MutableStateFlow(true)
 

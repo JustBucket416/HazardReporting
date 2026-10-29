@@ -197,6 +197,18 @@ class PhotoLocalDataSourceTest {
     }
 
     @Test
+    fun testDeleteAllPhotos() {
+        photoFile("a.jpg", lastModified = CUTOFF)
+        photoFile("b.jpg", lastModified = OLD)
+        val outside = temporaryFolder.newFile("database.db")
+
+        dataSource.deleteAllPhotos()
+
+        Truth.assertThat(photosDirectory.exists()).isFalse()
+        Truth.assertThat(outside.exists()).isTrue()
+    }
+
+    @Test
     fun testDeletePhoto() {
         val file = File(dataSource.createPhotoFile()).apply { writeBytes(JPEG_CONTENT) }
 

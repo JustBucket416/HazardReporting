@@ -2,11 +2,13 @@ package com.example.hazardreporting.di
 
 import com.example.hazardreporting.data.catalog.CatalogRepositoryImpl
 import com.example.hazardreporting.data.incident.IncidentRepositoryImpl
+import com.example.hazardreporting.data.local.DeviceDataRepositoryImpl
 import com.example.hazardreporting.data.location.FusedLocationProvider
 import com.example.hazardreporting.data.session.SessionRepositoryImpl
 import com.example.hazardreporting.data.sync.SyncRepositoryImpl
 import com.example.hazardreporting.data.sync.SyncSchedulerImpl
 import com.example.hazardreporting.domain.repository.CatalogRepository
+import com.example.hazardreporting.domain.repository.DeviceDataRepository
 import com.example.hazardreporting.domain.repository.IncidentRepository
 import com.example.hazardreporting.domain.repository.LocationProvider
 import com.example.hazardreporting.domain.repository.SessionRepository
@@ -58,4 +60,10 @@ interface RepositoryModule {
      */
     @Binds
     fun bindSyncRepository(repository: SyncRepositoryImpl): SyncRepository
+
+    /**
+     * Binds [DeviceDataRepositoryImpl] as the [DeviceDataRepository]
+     */
+    @Binds
+    fun bindDeviceDataRepository(repository: DeviceDataRepositoryImpl): DeviceDataRepository
 }

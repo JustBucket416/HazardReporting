@@ -13,6 +13,11 @@ sealed interface IncidentListEvent {
     data object RefreshFailed : IncidentListEvent
 
     /**
+     * The technician signed out and the device was wiped; the app goes to Login with the back stack cleared
+     */
+    data object LoggedOut : IncidentListEvent
+
+    /**
      * Something nobody expected failed; the screen shows a snackbar
      */
     data object UnexpectedError : IncidentListEvent

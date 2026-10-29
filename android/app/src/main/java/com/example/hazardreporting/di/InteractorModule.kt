@@ -4,6 +4,7 @@ import com.example.hazardreporting.domain.interactor.CatalogInteractor
 import com.example.hazardreporting.domain.interactor.IncidentInteractor
 import com.example.hazardreporting.domain.interactor.LoginInteractor
 import com.example.hazardreporting.domain.repository.CatalogRepository
+import com.example.hazardreporting.domain.repository.DeviceDataRepository
 import com.example.hazardreporting.domain.repository.IncidentRepository
 import com.example.hazardreporting.domain.repository.LocationProvider
 import com.example.hazardreporting.domain.repository.SessionRepository
@@ -25,8 +26,12 @@ object InteractorModule {
      * Provides the [LoginInteractor]
      */
     @Provides
-    fun provideLoginInteractor(sessionRepository: SessionRepository, syncScheduler: SyncScheduler): LoginInteractor =
-        LoginInteractor(sessionRepository, syncScheduler)
+    fun provideLoginInteractor(
+        sessionRepository: SessionRepository,
+        syncRepository: SyncRepository,
+        syncScheduler: SyncScheduler,
+        deviceDataRepository: DeviceDataRepository,
+    ): LoginInteractor = LoginInteractor(sessionRepository, syncRepository, syncScheduler, deviceDataRepository)
 
     /**
      * Provides the [CatalogInteractor]

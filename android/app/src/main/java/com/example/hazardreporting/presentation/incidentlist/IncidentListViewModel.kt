@@ -10,6 +10,7 @@ import com.example.hazardreporting.domain.interactor.IncidentInteractor
 import com.example.hazardreporting.domain.interactor.LoginInteractor
 import com.example.hazardreporting.domain.model.Category
 import com.example.hazardreporting.domain.model.IncidentSummary
+import com.example.hazardreporting.domain.model.LogoutResult
 import com.example.hazardreporting.domain.model.Severity
 import com.example.hazardreporting.domain.model.Site
 import com.example.hazardreporting.domain.model.SyncState
@@ -35,12 +36,13 @@ import kotlinx.coroutines.plus
  * Manages the incident list screen's state. The stored incidents are shown as they are; a refresh pushes the
  * pending changes and pulls the server's incidents on top of them. When the list is opened right after signing in
  * ([IncidentList.refreshOnOpen]), it starts with a first load that shows skeleton rows, or an error card if it fails
- * with nothing stored. A banner shows while the server rejects the session
+ * with nothing stored. A banner shows while the server rejects the session. Signing out from the ⋮ menu goes
+ * through the logout dialog's steps ([LogoutDialog])
  *
  * @param savedStateHandle holds the route and remembers that the opening refresh was started
  * @property incidentInteractor used for observing and refreshing the incidents
  * @param catalogInteractor used for naming each incident's category, severity and site
- * @param loginInteractor used for observing whether the session is still valid
+ * @property loginInteractor used for observing whether the session is still valid, and for signing out
  * @property dispatchers used for launching off the main thread
  * @param logger used for logging unexpected exceptions
  *
@@ -50,12 +52,14 @@ class IncidentListViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val incidentInteractor: IncidentInteractor,
     catalogInteractor: CatalogInteractor,
-    loginInteractor: LoginInteractor,
+    private val loginInteractor: LoginInteractor,
     private val dispatchers: CoroutineDispatchers,
     logger: Logger,
 ) : BaseViewModel(logger) {
 
     private val refreshStatus = MutableStateFlow(RefreshStatus())
+    private val logoutDialog = MutableStateFlow<LogoutDialog?>(null)
+    private val isLoggingOut = MutableStateFlow(false)
     private val _events = Channel<IncidentListEvent>(Channel.BUFFERED)
 
     /**
@@ -71,8 +75,9 @@ class IncidentListViewModel @Inject constructor(
         ),
         refreshStatus,
         loginInteractor.observeSessionInvalid(),
-    ) { incidents, catalog, refresh, isSessionInvalid ->
-        toUiState(incidents, catalog, refresh, isSessionInvalid)
+        logoutDialog,
+    ) { incidents, catalog, refresh, isSessionInvalid, logoutDialog ->
+        toUiState(incidents, catalog, refresh, isSessionInvalid, logoutDialog)
     }.stateIn(
         scope = viewModelScope + exceptionHandler + dispatchers.default,
         started = SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS),
@@ -107,9 +112,55 @@ class IncidentListViewModel @Inject constructor(
         refresh(RefreshKind.FirstLoad)
     }
 
+    /**
+     * Asks "Log out? Data on this device will be removed." after the technician picked Log out in the ⋮ menu
+     */
+    fun onLogoutClick() {
+        logoutDialog.update { LogoutDialog.Confirm }
+    }
+
+    /**
+     * Closes the logout dialog without signing out. Ignored while pending changes are being sent
+     */
+    fun onLogoutDismiss() {
+        logoutDialog.update { if (it is LogoutDialog.Sending) it else null }
+    }
+
+    /**
+     * Signs out after the technician confirmed: sends the pending changes first, and stops to warn if some
+     * couldn't be sent
+     */
+    fun onLogoutConfirm() {
+        logout(force = false)
+    }
+
+    /**
+     * Signs out although some pending changes couldn't be sent; they are lost
+     */
+    fun onLogoutAnyway() {
+        logout(force = true)
+    }
+
     override fun onUnexpected(throwable: Throwable) {
         refreshStatus.update { if (it.inFlight != null) RefreshStatus(hasFailed = true) else it }
+        if (isLoggingOut.getAndUpdate { false }) logoutDialog.update { null }
         _events.trySend(IncidentListEvent.UnexpectedError)
+    }
+
+    private fun logout(force: Boolean) {
+        if (isLoggingOut.getAndUpdate { true }) return
+
+        viewModelScope.launch(exceptionHandler + dispatchers.default) {
+            logoutDialog.update { LogoutDialog.Sending(loginInteractor.countPendingChanges()) }
+            when (val result = loginInteractor.logout(force)) {
+                // The dialog stays until the screen is gone
+                LogoutResult.LoggedOut -> _events.send(IncidentListEvent.LoggedOut)
+                is LogoutResult.PendingChangesRemain -> {
+                    logoutDialog.update { LogoutDialog.Unsent(result.count) }
+                    isLoggingOut.update { false }
+                }
+            }
+        }
     }
 
     private fun refresh(kind: RefreshKind) {
@@ -142,6 +193,7 @@ class IncidentListViewModel @Inject constructor(
         catalog: Catalog,
         refresh: RefreshStatus,
         isSessionInvalid: Boolean,
+        logoutDialog: LogoutDialog?,
     ): IncidentListUiState {
         val categoriesById = catalog.categories.associateBy { it.id }
         val severitiesById = catalog.severities.associateBy { it.id }
@@ -170,6 +222,7 @@ class IncidentListViewModel @Inject constructor(
             content = content,
             isRefreshing = refresh.inFlight == RefreshKind.Pull,
             isSessionInvalid = isSessionInvalid,
+            logoutDialog = logoutDialog,
         )
     }
 

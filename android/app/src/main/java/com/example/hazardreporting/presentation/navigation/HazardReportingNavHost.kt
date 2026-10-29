@@ -54,6 +54,7 @@ fun HazardReportingNavHost(
                 onReportSavedShown = { resultHandle[REPORT_SAVED_RESULT] = false },
                 onIncidentClick = { localId -> navController.navigate(IncidentDetail(localId)) },
                 onReportClick = { navController.navigate(IncidentForm()) },
+                onLoggedOut = { navController.navigateClearingBackStack(Login) },
             )
         }
         composable<IncidentDetail> { backStackEntry ->

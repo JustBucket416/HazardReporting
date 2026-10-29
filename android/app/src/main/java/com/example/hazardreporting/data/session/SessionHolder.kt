@@ -71,6 +71,15 @@ class SessionHolder @Inject constructor(
     }
 
     /**
+     * Deletes the session from DataStore and then from memory, so nobody is signed in
+     */
+    suspend fun clear() {
+        withContext(dispatchers.io) { localDataSource.clear() }
+        state.value = SessionState.Loaded(null)
+        _isRejected.value = false
+    }
+
+    /**
      * Records that the server rejected the session
      */
     fun markRejected() {

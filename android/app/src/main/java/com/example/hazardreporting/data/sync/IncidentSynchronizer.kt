@@ -81,6 +81,14 @@ class IncidentSynchronizer @Inject constructor(
         }
     }
 
+    /**
+     * Returns how many incidents have a pending change a push would still send; a withdrawal of a report that
+     * was never sent needs no request, so it doesn't count
+     */
+    suspend fun countUnsentChanges(): Int = withContext(dispatchers.io) {
+        localDataSource.getPendingIncidents().count { !it.isUnsentWithdrawal }
+    }
+
     private suspend fun deleteOrphanedPhotos() {
         val referencedPaths = localDataSource.getPhotoLocalPaths().toSet()
         val modifiedBefore = clock.millis() - ORPHANED_PHOTO_MIN_AGE.toMillis()

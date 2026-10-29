@@ -48,6 +48,15 @@ class SyncSchedulerImplTest {
     }
 
     @Test
+    fun testCancelScheduledPushes() {
+        every { workManager.cancelAllWork() } returns mockk<Operation>()
+
+        scheduler.cancelScheduledPushes()
+
+        verifySequence { workManager.cancelAllWork() }
+    }
+
+    @Test
     fun testSchedulePeriodicPush() {
         val request = slot<PeriodicWorkRequest>()
 

@@ -26,6 +26,21 @@
     <string name="login_error_no_connection">No connection</string>
     <string name="login_error_not_technician">Technicians only</string>
 
+    <!-- Logout -->
+    <string name="action_log_out">Log out</string>
+    <string name="logout_title">Log out?</string>
+    <string name="logout_confirm_text">Data on this device will be removed.</string>
+    <plurals name="logout_sending">
+        <item quantity="one">Sending %1$d pending report…</item>
+        <item quantity="other">Sending %1$d pending reports…</item>
+    </plurals>
+    <string name="logout_signing_out">Logging out…</string>
+    <plurals name="logout_unsent">
+        <item quantity="one">%1$d report couldn\'t be sent and will be lost</item>
+        <item quantity="other">%1$d reports couldn\'t be sent and will be lost</item>
+    </plurals>
+    <string name="logout_anyway">Log out anyway</string>
+
     <!-- Incidents -->
     <string name="incident_list_title">My incidents</string>
     <string name="incident_list_report">Report incident</string>

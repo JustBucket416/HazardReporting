@@ -125,6 +125,25 @@ class SessionHolderTest {
     }
 
     @Test
+    fun testClear() = runTest {
+        coJustRun { localDataSource.write(SESSION) }
+        coJustRun { localDataSource.clear() }
+
+        holder.save(SESSION)
+        holder.markRejected()
+        holder.clear()
+
+        // Signed out in DataStore and in memory, without another read
+        coVerifySequence {
+            localDataSource.write(SESSION)
+            localDataSource.clear()
+        }
+        Truth.assertThat(holder.sessionBlocking()).isNull()
+        Truth.assertThat(holder.session()).isNull()
+        Truth.assertThat(holder.isRejected.value).isFalse()
+    }
+
+    @Test
     fun testLoad_SessionSavedDuringRead() = runTest {
         val savedSession = SESSION.copy(token = "newer-token")
 
