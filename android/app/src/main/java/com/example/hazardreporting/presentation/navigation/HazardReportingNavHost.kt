@@ -10,6 +10,7 @@ import androidx.navigation.NavController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.toRoute
 import com.example.hazardreporting.presentation.incidentdetail.IncidentDetailRoute
 import com.example.hazardreporting.presentation.incidentform.IncidentFormRoute
 import com.example.hazardreporting.presentation.incidentlist.IncidentListRoute
@@ -55,18 +56,24 @@ fun HazardReportingNavHost(
                 onReportClick = { navController.navigate(IncidentForm()) },
             )
         }
-        composable<IncidentDetail> {
+        composable<IncidentDetail> { backStackEntry ->
+            val localId = backStackEntry.toRoute<IncidentDetail>().localId
             IncidentDetailRoute(
                 viewModel = viewModel(factory = viewModelFactory),
                 onBack = { navController.popBackStack() },
+                onEdit = { navController.navigate(IncidentForm(localId)) },
             )
         }
-        composable<IncidentForm> {
+        composable<IncidentForm> { backStackEntry ->
+            val isEditing = backStackEntry.toRoute<IncidentForm>().localId != null
             IncidentFormRoute(
                 viewModel = viewModel(factory = viewModelFactory),
                 onClose = { navController.popBackStack() },
                 onSaved = {
-                    navController.previousBackStackEntry?.savedStateHandle?.set(REPORT_SAVED_RESULT, true)
+                    // Only the list says "Report saved"; an edit goes back to the incident, which shows it
+                    if (!isEditing) {
+                        navController.previousBackStackEntry?.savedStateHandle?.set(REPORT_SAVED_RESULT, true)
+                    }
                     navController.popBackStack()
                 },
             )

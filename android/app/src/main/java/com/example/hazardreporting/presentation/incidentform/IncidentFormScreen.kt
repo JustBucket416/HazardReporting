@@ -215,7 +215,8 @@ data class IncidentFormActions(
 
 /**
  * The report form: photos first, then title, description, category, severity, site, location description
- * and the captured position. Field errors show as supporting text once [IncidentFormUiState.errors] names them
+ * and the captured position, which only a new report can re-capture. Field errors show as supporting text once
+ * [IncidentFormUiState.errors] names them. An edit form shows its fields once it has read the incident
  *
  * @param uiState state of the form
  * @param snackbarHostState shows the form's snackbars
@@ -266,7 +267,8 @@ fun IncidentFormScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            FormFields(uiState, actions)
+            // Reading the incident takes a moment; empty fields would flash meanwhile
+            if (!uiState.isLoading) FormFields(uiState, actions)
         }
     }
 
@@ -332,7 +334,12 @@ private fun FormFields(uiState: IncidentFormUiState, actions: IncidentFormAction
         onBlur = {},
         singleLine = true,
     )
-    PositionLine(uiState.position, uiState.positionStatus, actions.onRecapturePosition)
+    PositionLine(
+        position = uiState.position,
+        status = uiState.positionStatus,
+        // An edit keeps the original position
+        onRecapture = if (uiState.isEditing) null else actions.onRecapturePosition,
+    )
 }
 
 @Composable
@@ -516,7 +523,7 @@ private fun SeveritySelector(
 }
 
 @Composable
-private fun PositionLine(position: Position?, status: PositionStatus, onRecapture: () -> Unit) {
+private fun PositionLine(position: Position?, status: PositionStatus, onRecapture: (() -> Unit)?) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             FieldLabel(stringResource(R.string.incident_field_position))
@@ -533,8 +540,10 @@ private fun PositionLine(position: Position?, status: PositionStatus, onRecaptur
                 style = MaterialTheme.typography.bodyLarge,
             )
         }
-        TextButton(onClick = onRecapture, enabled = status != PositionStatus.Locating) {
-            Text(stringResource(R.string.incident_form_recapture))
+        if (onRecapture != null) {
+            TextButton(onClick = onRecapture, enabled = status != PositionStatus.Locating) {
+                Text(stringResource(R.string.incident_form_recapture))
+            }
         }
     }
 }
@@ -628,6 +637,23 @@ private fun IncidentFormScreenPreview() {
             title = "Conveyor belt fraying",
             categoryId = "cat-equipment",
             severityId = "sev-high",
+            photos = listOf(Photo.Remote("http://10.0.2.2:3001/uploads/seed/photo-05.png")),
+            position = Position(53.50534, -2.20063, 12.0),
+            positionStatus = PositionStatus.Captured,
+        )
+    )
+}
+
+@Preview(name = "Editing")
+@Composable
+private fun IncidentFormScreenEditingPreview() {
+    IncidentFormScreenPreviewContent(
+        PREVIEW_STATE.copy(
+            isEditing = true,
+            title = "Conveyor belt fraying",
+            categoryId = "cat-equipment",
+            severityId = "sev-high",
+            siteId = "site-north-plant",
             photos = listOf(Photo.Remote("http://10.0.2.2:3001/uploads/seed/photo-05.png")),
             position = Position(53.50534, -2.20063, 12.0),
             positionStatus = PositionStatus.Captured,

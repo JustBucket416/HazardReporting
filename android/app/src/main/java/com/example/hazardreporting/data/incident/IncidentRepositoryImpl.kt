@@ -78,6 +78,10 @@ class IncidentRepositoryImpl @Inject constructor(
         }
     }
 
+    override suspend fun getIncident(localId: Long): Incident? = withContext(dispatchers.io) {
+        localDataSource.getIncidentWithPhotos(localId)?.let { converter.convert(it) }
+    }
+
     override suspend fun report(draft: IncidentDraft): Long = withContext(dispatchers.io) {
         localDataSource.inTransaction {
             // The device's clock at first save; it never changes and is how the server deduplicates (ADR-0003).
@@ -87,6 +91,41 @@ class IncidentRepositoryImpl @Inject constructor(
             val localId = localDataSource.insertIncident(converter.convertNew(draft, createdAt))
             localDataSource.insertPhotos(converter.convertPhotos(localId, draft.photos))
             localId
+        }
+    }
+
+    override suspend fun edit(localId: Long, draft: IncidentDraft, syncState: SyncState) {
+        withContext(dispatchers.io) {
+            localDataSource.inTransaction {
+                val current = localDataSource.getIncident(localId) ?: return@inTransaction
+                val storedPhotos = localDataSource.getPhotos(localId)
+                val edited = converter.withDraft(current, draft)
+                    .copy(syncState = syncState, localVersion = current.localVersion + 1)
+                localDataSource.updateIncident(edited)
+                // The files of photos the edit removed are left to the push's cleanup of unreferenced files,
+                // in case a form that is still open attaches them again
+                localDataSource.replacePhotos(localId, converter.convertPhotos(localId, draft.photos, storedPhotos))
+            }
+        }
+    }
+
+    override suspend fun withdraw(localId: Long) {
+        withContext(dispatchers.io) {
+            localDataSource.inTransaction {
+                val current = localDataSource.getIncident(localId) ?: return@inTransaction
+                localDataSource.updateIncident(
+                    current.copy(syncState = SyncState.PendingWithdraw, localVersion = current.localVersion + 1)
+                )
+            }
+        }
+    }
+
+    override suspend fun dismissStatusChangeNotice(localId: Long) {
+        withContext(dispatchers.io) {
+            localDataSource.inTransaction {
+                val current = localDataSource.getIncident(localId) ?: return@inTransaction
+                localDataSource.updateIncident(current.copy(statusChangeNoticePending = false))
+            }
         }
     }
 

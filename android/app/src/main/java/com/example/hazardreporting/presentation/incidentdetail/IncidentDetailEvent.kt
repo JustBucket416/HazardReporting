@@ -13,6 +13,11 @@ sealed interface IncidentDetailEvent {
     data object RefreshFailed : IncidentDetailEvent
 
     /**
+     * The incident was withdrawn on the device; the screen goes back
+     */
+    data object Withdrawn : IncidentDetailEvent
+
+    /**
      * Something nobody expected failed; the screen shows a snackbar
      */
     data object UnexpectedError : IncidentDetailEvent

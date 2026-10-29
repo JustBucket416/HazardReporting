@@ -5,6 +5,7 @@ import com.example.hazardreporting.domain.exception.NoConnectionException
 import com.example.hazardreporting.domain.exception.UnauthorizedException
 import com.example.hazardreporting.domain.exception.ValidationException
 import com.example.hazardreporting.domain.model.Incident
+import com.example.hazardreporting.domain.model.IncidentDetails
 import com.example.hazardreporting.domain.model.IncidentDraft
 import com.example.hazardreporting.domain.model.IncidentStatus
 import com.example.hazardreporting.domain.model.IncidentSummary
@@ -21,6 +22,7 @@ import com.google.common.truth.Truth
 import io.mockk.Called
 import io.mockk.coEvery
 import io.mockk.coJustRun
+import io.mockk.coVerify
 import io.mockk.coVerifySequence
 import io.mockk.every
 import io.mockk.justRun
@@ -376,6 +378,194 @@ class IncidentInteractorTest {
         coVerifySequence { incidentRepository.deletePhoto(PHOTO) }
     }
 
+    @Test
+    fun testGetDraft() = runTest {
+        coEvery { incidentRepository.getIncident(7L) } returns Incident(summary(localId = 7, createdAt = 100), DETAILS)
+
+        val draft = interactor.getDraft(7L)
+
+        // The stored report fields, original position and photos
+        Truth.assertThat(draft).isEqualTo(
+            IncidentDraft(
+                title = "Incident 7",
+                description = DETAILS.description,
+                categoryId = "cat-equipment",
+                severityId = "sev-high",
+                siteId = "site-north",
+                locationDescription = DETAILS.locationDescription,
+                position = DETAILS.position,
+                photos = DETAILS.photos,
+            )
+        )
+    }
+
+    @Test
+    fun testGetDraft_DetailsNotDownloaded() = runTest {
+        coEvery { incidentRepository.getIncident(7L) } returns Incident(summary(localId = 7, createdAt = 100), null)
+
+        // Can't be edited without its details (ADR-0006)
+        Truth.assertThat(interactor.getDraft(7L)).isNull()
+    }
+
+    @Test
+    fun testGetDraft_NotStored() = runTest {
+        coEvery { incidentRepository.getIncident(7L) } returns null
+
+        Truth.assertThat(interactor.getDraft(7L)).isNull()
+    }
+
+    @Test
+    fun testEdit_Synced() = runTest {
+        verifyEditMovesTo(from = SyncState.Synced, to = SyncState.PendingUpdate)
+    }
+
+    @Test
+    fun testEdit_PendingUpdate() = runTest {
+        verifyEditMovesTo(from = SyncState.PendingUpdate, to = SyncState.PendingUpdate)
+    }
+
+    @Test
+    fun testEdit_PendingCreate() = runTest {
+        // Not on the server yet: the report goes out with the edit
+        verifyEditMovesTo(from = SyncState.PendingCreate, to = SyncState.PendingCreate)
+    }
+
+    @Test
+    fun testEdit_PendingWithdraw() = runTest {
+        coEvery { incidentRepository.getIncident(7L) } returns
+            Incident(summary(localId = 7, createdAt = 100, syncState = SyncState.PendingWithdraw), DETAILS)
+
+        interactor.edit(7L, VALID_DRAFT)
+
+        // Being withdrawn: nothing is left to edit
+        coVerifySequence { incidentRepository.getIncident(7L) }
+        verify { syncScheduler wasNot Called }
+    }
+
+    @Test
+    fun testEdit_NotStored() = runTest {
+        coEvery { incidentRepository.getIncident(7L) } returns null
+
+        interactor.edit(7L, VALID_DRAFT)
+
+        coVerifySequence { incidentRepository.getIncident(7L) }
+        verify { syncScheduler wasNot Called }
+    }
+
+    @Test
+    fun testEdit_Invalid() {
+        val draft = VALID_DRAFT.copy(title = " ", photos = emptyList())
+
+        val thrown = Assert.assertThrows(ValidationException::class.java) {
+            runTest { interactor.edit(7L, draft) }
+        }
+
+        // Nothing is stored
+        Truth.assertThat(thrown.fields).containsExactly(IncidentDraft.Field.Title, IncidentDraft.Field.Photos)
+        verify { incidentRepository wasNot Called }
+        verify { syncScheduler wasNot Called }
+    }
+
+    @Test
+    fun testEdit_TrimsTexts() = runTest {
+        val draft = VALID_DRAFT.copy(
+            title = "  Leaking valve ",
+            description = " Dripping ",
+            locationDescription = " B2 ",
+        )
+
+        coEvery { incidentRepository.getIncident(7L) } returns Incident(summary(localId = 7, createdAt = 100), DETAILS)
+        coJustRun { incidentRepository.edit(any(), any(), any()) }
+        justRun { syncScheduler.schedulePush() }
+
+        interactor.edit(7L, draft)
+
+        coVerify {
+            incidentRepository.edit(
+                7L,
+                draft.copy(title = "Leaking valve", description = "Dripping", locationDescription = "B2"),
+                SyncState.PendingUpdate,
+            )
+        }
+    }
+
+    @Test
+    fun testWithdraw_Synced() = runTest {
+        verifyWithdraws(from = SyncState.Synced)
+    }
+
+    @Test
+    fun testWithdraw_PendingUpdate() = runTest {
+        verifyWithdraws(from = SyncState.PendingUpdate)
+    }
+
+    @Test
+    fun testWithdraw_PendingCreate() = runTest {
+        // The push decides by createAttempted whether it is deleted or sent (ADR-0003)
+        verifyWithdraws(from = SyncState.PendingCreate)
+    }
+
+    @Test
+    fun testWithdraw_PendingWithdraw() = runTest {
+        coEvery { incidentRepository.getIncident(7L) } returns
+            Incident(summary(localId = 7, createdAt = 100, syncState = SyncState.PendingWithdraw), null)
+
+        interactor.withdraw(7L)
+
+        coVerifySequence { incidentRepository.getIncident(7L) }
+        verify { syncScheduler wasNot Called }
+    }
+
+    @Test
+    fun testWithdraw_NotStored() = runTest {
+        coEvery { incidentRepository.getIncident(7L) } returns null
+
+        interactor.withdraw(7L)
+
+        coVerifySequence { incidentRepository.getIncident(7L) }
+        verify { syncScheduler wasNot Called }
+    }
+
+    @Test
+    fun testDismissStatusChangeNotice() = runTest {
+        coJustRun { incidentRepository.dismissStatusChangeNotice(7L) }
+
+        interactor.dismissStatusChangeNotice(7L)
+
+        coVerifySequence { incidentRepository.dismissStatusChangeNotice(7L) }
+    }
+
+    private suspend fun verifyEditMovesTo(from: SyncState, to: SyncState) {
+        coEvery { incidentRepository.getIncident(7L) } returns
+            Incident(summary(localId = 7, createdAt = 100, syncState = from), DETAILS)
+        coJustRun { incidentRepository.edit(7L, VALID_DRAFT, to) }
+        justRun { syncScheduler.schedulePush() }
+
+        interactor.edit(7L, VALID_DRAFT)
+
+        // Saved on the device first; the push is only scheduled (ADR-0002)
+        coVerifySequence {
+            incidentRepository.getIncident(7L)
+            incidentRepository.edit(7L, VALID_DRAFT, to)
+            syncScheduler.schedulePush()
+        }
+    }
+
+    private suspend fun verifyWithdraws(from: SyncState) {
+        coEvery { incidentRepository.getIncident(7L) } returns
+            Incident(summary(localId = 7, createdAt = 100, syncState = from), DETAILS)
+        coJustRun { incidentRepository.withdraw(7L) }
+        justRun { syncScheduler.schedulePush() }
+
+        interactor.withdraw(7L)
+
+        coVerifySequence {
+            incidentRepository.getIncident(7L)
+            incidentRepository.withdraw(7L)
+            syncScheduler.schedulePush()
+        }
+    }
+
     private fun summary(
         localId: Long,
         createdAt: Long,
@@ -408,6 +598,14 @@ class IncidentInteractorTest {
             locationDescription = "",
             position = POSITION,
             photos = listOf(PHOTO),
+        )
+
+        val DETAILS = IncidentDetails(
+            description = "Fraying near the transfer point",
+            locationDescription = "Line 3",
+            position = POSITION,
+            photos = listOf(Photo.Remote("http://10.0.2.2:3001/uploads/a.jpg"), PHOTO),
+            priority = null,
         )
     }
 }

@@ -17,6 +17,7 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -30,6 +31,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
@@ -68,12 +70,13 @@ import kotlinx.coroutines.launch
  * The incident detail screen bound to its [IncidentDetailViewModel]
  *
  * @param viewModel manages the screen's state
- * @param onBack called when the user leaves the screen with the top bar's back button
+ * @param onBack called when the screen should be left: from the top bar's back button, or after a withdrawal
+ * @param onEdit called when the user picks Edit in the ⋮ menu
  *
  * @author Roman Pliskin on 29.10.2026
  */
 @Composable
-fun IncidentDetailRoute(viewModel: IncidentDetailViewModel, onBack: () -> Unit) {
+fun IncidentDetailRoute(viewModel: IncidentDetailViewModel, onBack: () -> Unit, onEdit: () -> Unit) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
     val coroutineScope = rememberCoroutineScope()
@@ -81,37 +84,67 @@ fun IncidentDetailRoute(viewModel: IncidentDetailViewModel, onBack: () -> Unit) 
     val unexpectedErrorMessage = stringResource(R.string.error_unexpected)
 
     CollectEvents(viewModel.events) { event ->
-        val message = when (event) {
-            IncidentDetailEvent.RefreshFailed -> refreshFailedMessage
-            IncidentDetailEvent.UnexpectedError -> unexpectedErrorMessage
+        when (event) {
+            IncidentDetailEvent.RefreshFailed -> coroutineScope.launch {
+                snackbarHostState.showSnackbar(refreshFailedMessage)
+            }
+            IncidentDetailEvent.UnexpectedError -> coroutineScope.launch {
+                snackbarHostState.showSnackbar(unexpectedErrorMessage)
+            }
+            IncidentDetailEvent.Withdrawn -> onBack()
         }
-        coroutineScope.launch { snackbarHostState.showSnackbar(message) }
     }
 
     IncidentDetailScreen(
         uiState = uiState,
         snackbarHostState = snackbarHostState,
-        onBack = onBack,
-        onRefresh = viewModel::onRefresh,
-        onRetry = viewModel::onRetry,
-        // Editing and withdrawing arrive with issue 14
-        onEdit = {},
-        onWithdraw = {},
+        actions = IncidentDetailActions(
+            onBack = onBack,
+            onRefresh = viewModel::onRefresh,
+            onRetry = viewModel::onRetry,
+            onEdit = onEdit,
+            onWithdraw = viewModel::onWithdrawClick,
+            onWithdrawConfirm = viewModel::onWithdrawConfirm,
+            onWithdrawDismiss = viewModel::onWithdrawDismiss,
+            onDismissStatusChangeNotice = viewModel::onDismissStatusChangeNotice,
+        ),
     )
 }
 
 /**
+ * What the incident detail screen's controls do
+ *
+ * @property onBack called when the user taps the back button
+ * @property onRefresh called on a pull-to-refresh
+ * @property onRetry called when the user taps Retry under "Details not downloaded"
+ * @property onEdit called when the user picks Edit in the ⋮ menu
+ * @property onWithdraw called when the user picks Withdraw… in the ⋮ menu
+ * @property onWithdrawConfirm called when the user confirms the withdrawal
+ * @property onWithdrawDismiss called when the user keeps the report instead
+ * @property onDismissStatusChangeNotice called when the user dismisses the Status Change Notice
+ *
+ * @author Roman Pliskin on 29.10.2026
+ */
+data class IncidentDetailActions(
+    val onBack: () -> Unit,
+    val onRefresh: () -> Unit,
+    val onRetry: () -> Unit,
+    val onEdit: () -> Unit,
+    val onWithdraw: () -> Unit,
+    val onWithdrawConfirm: () -> Unit,
+    val onWithdrawDismiss: () -> Unit,
+    val onDismissStatusChangeNotice: () -> Unit,
+)
+
+/**
  * One incident: its photos in a pager, chips, and every field a technician may see (no assignee).
  * The fields that need downloaded details shimmer until they arrive, or offer Retry if downloading failed.
- * The ⋮ menu with Edit and Withdraw shows only once the details are downloaded and while the incident is Open
+ * The ⋮ menu with Edit and Withdraw… shows only once the details are downloaded and while the incident is Open;
+ * Withdraw… asks for confirmation. A Status Change Notice shows as a banner until it is dismissed
  *
  * @param uiState state of the screen
  * @param snackbarHostState shows the screen's snackbars
- * @param onBack called when the user taps the back button
- * @param onRefresh called on a pull-to-refresh
- * @param onRetry called when the user taps Retry under "Details not downloaded"
- * @param onEdit called when the user picks Edit in the ⋮ menu
- * @param onWithdraw called when the user picks Withdraw in the ⋮ menu
+ * @param actions what the screen's controls do
  * @param modifier modifier for the screen's root
  *
  * @author Roman Pliskin on 29.10.2026
@@ -121,11 +154,7 @@ fun IncidentDetailRoute(viewModel: IncidentDetailViewModel, onBack: () -> Unit) 
 fun IncidentDetailScreen(
     uiState: IncidentDetailUiState,
     snackbarHostState: SnackbarHostState,
-    onBack: () -> Unit,
-    onRefresh: () -> Unit,
-    onRetry: () -> Unit,
-    onEdit: () -> Unit,
-    onWithdraw: () -> Unit,
+    actions: IncidentDetailActions,
     modifier: Modifier = Modifier,
 ) {
     Scaffold(
@@ -134,12 +163,12 @@ fun IncidentDetailScreen(
             TopAppBar(
                 title = { Text(stringResource(R.string.incident_detail_title)) },
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
+                    IconButton(onClick = actions.onBack) {
                         Icon(painterResource(R.drawable.ic_arrow_back), stringResource(R.string.action_back))
                     }
                 },
                 actions = {
-                    if (uiState.isMenuVisible) IncidentMenu(onEdit, onWithdraw)
+                    if (uiState.isMenuVisible) IncidentMenu(actions.onEdit, actions.onWithdraw)
                 },
             )
         },
@@ -147,7 +176,7 @@ fun IncidentDetailScreen(
     ) { innerPadding ->
         PullToRefreshBox(
             isRefreshing = uiState.isRefreshing,
-            onRefresh = onRefresh,
+            onRefresh = actions.onRefresh,
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding),
@@ -157,10 +186,12 @@ fun IncidentDetailScreen(
                     .fillMaxSize()
                     .verticalScroll(rememberScrollState()),
             ) {
-                uiState.incident?.let { IncidentContent(it, onRetry) }
+                uiState.incident?.let { IncidentContent(it, actions) }
             }
         }
     }
+
+    if (uiState.isWithdrawDialogVisible) WithdrawDialog(actions)
 }
 
 @Composable
@@ -190,7 +221,22 @@ private fun IncidentMenu(onEdit: () -> Unit, onWithdraw: () -> Unit) {
 }
 
 @Composable
-private fun IncidentContent(incident: IncidentDetailContent, onRetry: () -> Unit) {
+private fun WithdrawDialog(actions: IncidentDetailActions) {
+    AlertDialog(
+        onDismissRequest = actions.onWithdrawDismiss,
+        title = { Text(stringResource(R.string.incident_withdraw_title)) },
+        text = { Text(stringResource(R.string.incident_withdraw_text)) },
+        confirmButton = {
+            TextButton(onClick = actions.onWithdrawConfirm) { Text(stringResource(R.string.incident_withdraw_confirm)) }
+        },
+        dismissButton = {
+            TextButton(onClick = actions.onWithdrawDismiss) { Text(stringResource(R.string.action_cancel)) }
+        },
+    )
+}
+
+@Composable
+private fun IncidentContent(incident: IncidentDetailContent, actions: IncidentDetailActions) {
     when (val details = incident.details) {
         is IncidentDetailsState.Loaded -> if (details.details.photos.isNotEmpty()) PhotoPager(details.details.photos)
         IncidentDetailsState.Loading -> ShimmerPlaceholder(
@@ -211,6 +257,9 @@ private fun IncidentContent(incident: IncidentDetailContent, onRetry: () -> Unit
             StatusChip(incident.status)
             SeverityChip(incident.severity)
         }
+        if (incident.hasStatusChangeNotice) {
+            StatusChangeNotice(incident.status, actions.onDismissStatusChangeNotice)
+        }
         if (incident.isPending) PendingIndicator()
 
         val missing = stringResource(R.string.value_missing)
@@ -221,7 +270,38 @@ private fun IncidentContent(incident: IncidentDetailContent, onRetry: () -> Unit
         when (val details = incident.details) {
             is IncidentDetailsState.Loaded -> LoadedDetails(details.details)
             IncidentDetailsState.Loading -> LoadingDetails()
-            IncidentDetailsState.NotDownloaded -> DetailsNotDownloaded(onRetry)
+            IncidentDetailsState.NotDownloaded -> DetailsNotDownloaded(actions.onRetry)
+        }
+    }
+}
+
+@Composable
+private fun StatusChangeNotice(status: IncidentStatus, onDismiss: () -> Unit) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.errorContainer,
+            contentColor = MaterialTheme.colorScheme.onErrorContainer,
+        ),
+    ) {
+        Column(
+            modifier = Modifier.padding(start = 16.dp, top = 16.dp, end = 8.dp, bottom = 4.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            Row(
+                modifier = Modifier.padding(end = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                // Decorative: the text says it all
+                Icon(painterResource(R.drawable.ic_warning), contentDescription = null)
+                Text(
+                    text = stringResource(R.string.incident_status_change_notice_banner, status.label()),
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+            }
+            TextButton(onClick = onDismiss, modifier = Modifier.align(Alignment.End)) {
+                Text(stringResource(R.string.action_dismiss))
+            }
         }
     }
 }
@@ -376,6 +456,19 @@ private fun IncidentDetailScreenLoadingPreview() {
     IncidentDetailScreenPreviewContent(PREVIEW_CONTENT)
 }
 
+@Preview(name = "Status Change Notice")
+@Composable
+private fun IncidentDetailScreenNoticePreview() {
+    IncidentDetailScreenPreviewContent(
+        PREVIEW_CONTENT.copy(
+            status = IncidentStatus.Acknowledged,
+            isPending = false,
+            hasStatusChangeNotice = true,
+            details = IncidentDetailsState.NotDownloaded,
+        )
+    )
+}
+
 @Preview(name = "Not downloaded")
 @Composable
 private fun IncidentDetailScreenNotDownloadedPreview() {
@@ -388,11 +481,16 @@ private fun IncidentDetailScreenPreviewContent(content: IncidentDetailContent) {
         IncidentDetailScreen(
             uiState = IncidentDetailUiState(incident = content),
             snackbarHostState = remember { SnackbarHostState() },
-            onBack = {},
-            onRefresh = {},
-            onRetry = {},
-            onEdit = {},
-            onWithdraw = {},
+            actions = IncidentDetailActions(
+                onBack = {},
+                onRefresh = {},
+                onRetry = {},
+                onEdit = {},
+                onWithdraw = {},
+                onWithdrawConfirm = {},
+                onWithdrawDismiss = {},
+                onDismissStatusChangeNotice = {},
+            ),
         )
     }
 }
@@ -405,5 +503,6 @@ private val PREVIEW_CONTENT = IncidentDetailContent(
     siteName = "North Plant",
     createdAt = 1_793_015_100_000L,
     isPending = true,
+    hasStatusChangeNotice = false,
     details = IncidentDetailsState.Loading,
 )

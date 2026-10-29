@@ -97,7 +97,9 @@ class IncidentSynchronizerTest {
         every { dispatchers.io } returns UnconfinedTestDispatcher()
         stubLocalDataSource()
         stubServer()
-        every { photoLocalDataSource.formatOf(any()) } answers { if (firstArg<String>() in files) ImageFormat.Jpeg else null }
+        every { photoLocalDataSource.formatOf(any()) } answers {
+            if (firstArg<String>() in files) ImageFormat.Jpeg else null
+        }
         every { photoLocalDataSource.deletePhoto(any()) } answers { files -= firstArg<String>() }
         justRun { photoLocalDataSource.deleteUnreferencedPhotos(any(), any()) }
         justRun { sessionHolder.markRejected() }
@@ -461,7 +463,7 @@ class IncidentSynchronizerTest {
     fun testPush_RetriedWithdrawalAlreadyWithdrawn() = runTest {
         // The first PATCH succeeded, but its response was lost
         server["inc-1"] = serverIncident("inc-1", synced(1, "inc-1")).copy(status = "withdrawn")
-        storeIncident(synced(1, "inc-1").copy(syncState = SyncState.PendingWithdraw, localVersion = 1), remote = REMOTE_A)
+        storeIncident(withdrawn(synced(1, "inc-1")), remote = REMOTE_A)
 
         synchronizer.push()
 
@@ -475,7 +477,7 @@ class IncidentSynchronizerTest {
     @Test
     fun testPush_PendingWithdrawConflict() = runTest {
         server["inc-1"] = serverIncident("inc-1", synced(1, "inc-1")).copy(status = "in_progress")
-        storeIncident(synced(1, "inc-1").copy(syncState = SyncState.PendingWithdraw, localVersion = 1), remote = REMOTE_A)
+        storeIncident(withdrawn(synced(1, "inc-1")), remote = REMOTE_A)
 
         synchronizer.push()
 
@@ -511,7 +513,8 @@ class IncidentSynchronizerTest {
     fun testPush_PostAnsweredWithMovedOnIncident() = runTest {
         // Reported, the response lost, then acknowledged; the report was edited on the device meanwhile
         server["inc-1"] = serverIncident("inc-1", report(1)).copy(status = "acknowledged")
-        storeIncident(report(1).copy(title = "Edited offline", createAttempted = true, localVersion = 1), remote = REMOTE_A)
+        val editedOffline = report(1).copy(title = "Edited offline", createAttempted = true, localVersion = 1)
+        storeIncident(editedOffline, remote = REMOTE_A)
 
         synchronizer.push()
 
@@ -878,7 +881,8 @@ class IncidentSynchronizerTest {
      * Edits the stored incident with [localId] the way the device does, as if the technician saved the form
      */
     private fun editStored(localId: Long, title: String) {
-        incidents[localId] = incidents.getValue(localId).let { it.copy(title = title, localVersion = it.localVersion + 1) }
+        val stored = incidents.getValue(localId)
+        incidents[localId] = stored.copy(title = title, localVersion = stored.localVersion + 1)
     }
 
     private fun report(localId: Long) = IncidentEntity(
@@ -914,6 +918,11 @@ class IncidentSynchronizerTest {
     private fun edited(incident: IncidentEntity, title: String) = incident.copy(
         title = title,
         syncState = SyncState.PendingUpdate,
+        localVersion = incident.localVersion + 1,
+    )
+
+    private fun withdrawn(incident: IncidentEntity) = incident.copy(
+        syncState = SyncState.PendingWithdraw,
         localVersion = incident.localVersion + 1,
     )
 

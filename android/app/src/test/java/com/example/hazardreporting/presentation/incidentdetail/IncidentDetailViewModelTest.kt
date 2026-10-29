@@ -270,6 +270,110 @@ class IncidentDetailViewModelTest {
     }
 
     @Test
+    fun testUiState_StatusChangeNoticeArrives() = runTest {
+        incident.value = Incident(SUMMARY.copy(syncState = SyncState.PendingUpdate), DETAILS)
+        coJustRun { incidentInteractor.loadIncidentDetails(LOCAL_ID, force = false) }
+
+        val viewModel = createViewModel()
+        collectUiState(viewModel)
+        advanceUntilIdle()
+
+        // A push refuses the edit while the screen is open
+        incident.value = Incident(
+            SUMMARY.copy(status = IncidentStatus.Acknowledged, hasStatusChangeNotice = true),
+            DETAILS,
+        )
+        advanceUntilIdle()
+
+        // The banner shows at once, and the menu goes, as the incident is no longer Open
+        Truth.assertThat(viewModel.uiState.value.incident).isEqualTo(
+            CONTENT.copy(
+                status = IncidentStatus.Acknowledged,
+                hasStatusChangeNotice = true,
+                details = IncidentDetailsState.Loaded(DETAILS),
+            )
+        )
+        Truth.assertThat(viewModel.uiState.value.isMenuVisible).isFalse()
+    }
+
+    @Test
+    fun testOnDismissStatusChangeNotice() = runTest {
+        coJustRun { incidentInteractor.loadIncidentDetails(LOCAL_ID, force = false) }
+        coJustRun { incidentInteractor.dismissStatusChangeNotice(LOCAL_ID) }
+
+        val viewModel = createViewModel()
+        viewModel.onDismissStatusChangeNotice()
+        advanceUntilIdle()
+
+        coVerify(exactly = 1) { incidentInteractor.dismissStatusChangeNotice(LOCAL_ID) }
+    }
+
+    @Test
+    fun testWithdrawDialog_Dismissed() = runTest {
+        incident.value = Incident(SUMMARY, DETAILS)
+        coJustRun { incidentInteractor.loadIncidentDetails(LOCAL_ID, force = false) }
+
+        val viewModel = createViewModel()
+        collectUiState(viewModel)
+        advanceUntilIdle()
+
+        viewModel.onWithdrawClick()
+        advanceUntilIdle()
+
+        // Asks first
+        Truth.assertThat(viewModel.uiState.value.isWithdrawDialogVisible).isTrue()
+
+        viewModel.onWithdrawDismiss()
+        advanceUntilIdle()
+
+        Truth.assertThat(viewModel.uiState.value.isWithdrawDialogVisible).isFalse()
+        coVerify(exactly = 0) { incidentInteractor.withdraw(any()) }
+    }
+
+    @Test
+    fun testOnWithdrawConfirm() = runTest {
+        incident.value = Incident(SUMMARY, DETAILS)
+        coJustRun { incidentInteractor.loadIncidentDetails(LOCAL_ID, force = false) }
+        coJustRun { incidentInteractor.withdraw(LOCAL_ID) }
+
+        val viewModel = createViewModel()
+        collectUiState(viewModel)
+        advanceUntilIdle()
+
+        viewModel.events.test {
+            viewModel.onWithdrawClick()
+            viewModel.onWithdrawConfirm()
+            advanceUntilIdle()
+
+            // Withdrawn on the device, then the screen goes back
+            Truth.assertThat(awaitItem()).isEqualTo(IncidentDetailEvent.Withdrawn)
+        }
+
+        coVerify(exactly = 1) { incidentInteractor.withdraw(LOCAL_ID) }
+        Truth.assertThat(viewModel.uiState.value.isWithdrawDialogVisible).isFalse()
+    }
+
+    @Test
+    fun testOnWithdrawConfirm_UnexpectedException() = runTest {
+        val exception = IllegalStateException()
+
+        coJustRun { incidentInteractor.loadIncidentDetails(LOCAL_ID, force = false) }
+        coEvery { incidentInteractor.withdraw(LOCAL_ID) } throws exception
+        justRun { logger.error(any(), any(), exception) }
+
+        val viewModel = createViewModel()
+        advanceUntilIdle()
+
+        viewModel.events.test {
+            viewModel.onWithdrawConfirm()
+            advanceUntilIdle()
+
+            // The screen stays, with a snackbar
+            Truth.assertThat(awaitItem()).isEqualTo(IncidentDetailEvent.UnexpectedError)
+        }
+    }
+
+    @Test
     fun testOnRefresh_UnexpectedException() = runTest {
         val exception = IllegalStateException()
 
@@ -341,6 +445,7 @@ class IncidentDetailViewModelTest {
             siteName = "North Plant",
             createdAt = CREATED_AT,
             isPending = false,
+            hasStatusChangeNotice = false,
             details = IncidentDetailsState.Loading,
         )
     }

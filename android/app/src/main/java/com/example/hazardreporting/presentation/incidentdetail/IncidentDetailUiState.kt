@@ -9,12 +9,14 @@ import com.example.hazardreporting.domain.model.Severity
  *
  * @property incident the incident, or null until it is read from the device
  * @property isRefreshing whether a pull-to-refresh is in flight
+ * @property isWithdrawDialogVisible whether "Withdraw this report?" asks for confirmation
  *
  * @author Roman Pliskin on 29.10.2026
  */
 data class IncidentDetailUiState(
     val incident: IncidentDetailContent? = null,
     val isRefreshing: Boolean = false,
+    val isWithdrawDialogVisible: Boolean = false,
 ) {
 
     /**
@@ -38,6 +40,8 @@ data class IncidentDetailUiState(
  * @property siteName name of the incident's site, or null if it isn't in the stored catalog
  * @property createdAt when the incident was reported, in epoch milliseconds
  * @property isPending whether the incident has a change the server hasn't accepted yet
+ * @property hasStatusChangeNotice whether a pending change was refused because an operator had moved the incident
+ * out of Open, and the technician hasn't dismissed the notice yet
  * @property details the incident's details, or why they aren't shown
  *
  * @author Roman Pliskin on 29.10.2026
@@ -50,6 +54,7 @@ data class IncidentDetailContent(
     val siteName: String?,
     val createdAt: Long,
     val isPending: Boolean,
+    val hasStatusChangeNotice: Boolean,
     val details: IncidentDetailsState,
 )
 

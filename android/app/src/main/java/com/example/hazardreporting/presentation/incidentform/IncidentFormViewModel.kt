@@ -37,9 +37,10 @@ import kotlinx.coroutines.plus
  * Validation rules live in [IncidentInteractor]; this class only decides when their errors show:
  * after the first Save, or once a field lost focus.
  *
- * The form reports a new incident when [IncidentForm.localId] is null. Editing (issue 14) fills
- * [IncidentFormState.fields] and [IncidentFormState.initialFields] from the stored incident, keeps its position,
- * and saves through the interactor's edit instead of [IncidentInteractor.report]
+ * The form reports a new incident when [IncidentForm.localId] is null. Otherwise it edits that incident: it fills
+ * [IncidentFormState.fields] and [IncidentFormState.initialFields] from the stored incident once, keeps its original
+ * position, and saves through [IncidentInteractor.edit]. An incident that can't be edited, e.g. one deleted meanwhile,
+ * closes the form
  *
  * @param savedStateHandle holds the route and the form's state
  * @property incidentInteractor used for validating and saving the report, capturing the position and managing
@@ -58,7 +59,8 @@ class IncidentFormViewModel @Inject constructor(
     logger: Logger,
 ) : BaseViewModel(logger) {
 
-    private val isEditing = savedStateHandle.toRoute<IncidentForm>().localId != null
+    private val editedLocalId = savedStateHandle.toRoute<IncidentForm>().localId
+    private val isEditing = editedLocalId != null
 
     // The handle saves this flow's latest value whenever the app's state is saved; it mirrors form as JSON
     private val savedForm = savedStateHandle.getMutableStateFlow(KEY_FORM, "")
@@ -82,7 +84,7 @@ class IncidentFormViewModel @Inject constructor(
     }.stateIn(
         scope = viewModelScope + exceptionHandler + dispatchers.default,
         started = SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS),
-        initialValue = IncidentFormUiState(isEditing = isEditing),
+        initialValue = IncidentFormUiState(isEditing = isEditing, isLoading = isEditing),
     )
 
     /**
@@ -94,9 +96,12 @@ class IncidentFormViewModel @Inject constructor(
         viewModelScope.launch(exceptionHandler + dispatchers.default) {
             form.collect { state -> savedForm.update { state.encode() } }
         }
-        // A new report captures the position once when the form opens. A form restored while locating asks again;
-        // with permission already granted, that only captures a new fix
-        if (!isEditing && form.value.positionStatus == PositionStatus.Locating) {
+        if (editedLocalId != null) {
+            // Read once; a form restored after process death keeps what the technician changed since
+            if (!form.value.isPrefilled) prefill(editedLocalId)
+        } else if (form.value.positionStatus == PositionStatus.Locating) {
+            // A new report captures the position once when the form opens. A form restored while locating asks
+            // again; with permission already granted, that only captures a new fix
             _events.trySend(IncidentFormEvent.RequestLocationPermission)
         }
     }
@@ -256,16 +261,22 @@ class IncidentFormViewModel @Inject constructor(
     }
 
     /**
-     * Saves the report on the device at once and leaves the form. If the draft is invalid, nothing is saved
-     * and every error shows. Ignored while a save is in flight
+     * Saves the report, or the edit, on the device at once and leaves the form. If the draft is invalid, nothing is
+     * saved and every error shows. Ignored while a save is in flight, and while an edit form is still reading
+     * the incident
      */
     fun onSave() {
+        if (isEditing && !form.value.isPrefilled) return
         val draft = form.updateAndGet { it.copy(isSaveAttempted = true) }.toDraft()
         if (isSaving.getAndUpdate { true }) return
 
         viewModelScope.launch(exceptionHandler + dispatchers.default) {
             try {
-                incidentInteractor.report(draft)
+                if (editedLocalId != null) {
+                    incidentInteractor.edit(editedLocalId, draft)
+                } else {
+                    incidentInteractor.report(draft)
+                }
                 // Stays saving while the screen leaves, so a second tap can't save twice
                 _events.send(IncidentFormEvent.Saved)
             } catch (e: ValidationException) {
@@ -320,6 +331,36 @@ class IncidentFormViewModel @Inject constructor(
         _events.trySend(IncidentFormEvent.UnexpectedError)
     }
 
+    private fun prefill(localId: Long) {
+        viewModelScope.launch(exceptionHandler + dispatchers.default) {
+            val draft = incidentInteractor.getDraft(localId)
+            if (draft == null) {
+                _events.send(IncidentFormEvent.Closed)
+                return@launch
+            }
+            val fields = IncidentFormFields(
+                title = draft.title,
+                description = draft.description,
+                categoryId = draft.categoryId,
+                severityId = draft.severityId,
+                siteId = draft.siteId,
+                locationDescription = draft.locationDescription,
+                photos = draft.photos.map { FormPhoto.of(it) },
+            )
+            val position = draft.position?.let { FormPosition.of(it) }
+            form.update {
+                it.copy(
+                    fields = fields,
+                    initialFields = fields,
+                    // The original position is kept; an edit never captures a new one
+                    position = position,
+                    positionStatus = if (position != null) PositionStatus.Captured else PositionStatus.Unavailable,
+                    isPrefilled = true,
+                )
+            }
+        }
+    }
+
     private fun updateFields(transform: (IncidentFormFields) -> IncidentFormFields) {
         form.update { it.copy(fields = transform(it.fields)) }
     }
@@ -357,6 +398,7 @@ class IncidentFormViewModel @Inject constructor(
         val shownFields = if (form.isSaveAttempted) invalidFields else invalidFields intersect form.touchedFields
         return IncidentFormUiState(
             isEditing = isEditing,
+            isLoading = isEditing && !form.isPrefilled,
             title = form.fields.title,
             description = form.fields.description,
             categoryId = form.fields.categoryId,

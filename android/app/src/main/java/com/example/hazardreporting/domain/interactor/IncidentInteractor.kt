@@ -113,15 +113,72 @@ class IncidentInteractor(
         val invalidFields = validate(draft)
         if (invalidFields.isNotEmpty()) throw ValidationException(invalidFields)
 
-        val localId = incidentRepository.report(
-            draft.copy(
-                title = draft.title.trim(),
-                description = draft.description.trim(),
-                locationDescription = draft.locationDescription.trim(),
-            )
-        )
+        val localId = incidentRepository.report(draft.trimmed())
         syncScheduler.schedulePush()
         return localId
+    }
+
+    /**
+     * Returns the draft the incident with [localId] is edited from: its report fields, its original position and
+     * its photos. Null if no such incident is stored, or its details aren't downloaded, without which it can't
+     * be edited (ADR-0006)
+     */
+    suspend fun getDraft(localId: Long): IncidentDraft? {
+        val incident = incidentRepository.getIncident(localId) ?: return null
+        val details = incident.details ?: return null
+        val summary = incident.summary
+        return IncidentDraft(
+            title = summary.title,
+            description = details.description,
+            categoryId = summary.categoryId,
+            severityId = summary.severityId,
+            siteId = summary.siteId,
+            locationDescription = details.locationDescription,
+            position = details.position,
+            photos = details.photos,
+        )
+    }
+
+    /**
+     * Edits the incident with [localId] to match [draft], with its text fields trimmed, and schedules a push.
+     * Never waits for the network (ADR-0002). A synced incident gets a pending edit; a report the server hasn't
+     * accepted yet stays a pending report, which then goes out with the edit. An incident being withdrawn
+     * is left as it is. Whether the incident is still Open is the server's call: if an operator moved it on,
+     * the push drops the edit and raises a Status Change Notice (ADR-0004)
+     *
+     * @throws ValidationException if the draft breaks a rule of [validate]; nothing is stored then
+     */
+    suspend fun edit(localId: Long, draft: IncidentDraft) {
+        val invalidFields = validate(draft)
+        if (invalidFields.isNotEmpty()) throw ValidationException(invalidFields)
+
+        val incident = incidentRepository.getIncident(localId) ?: return
+        val syncState = when (incident.summary.syncState) {
+            SyncState.Synced, SyncState.PendingUpdate -> SyncState.PendingUpdate
+            SyncState.PendingCreate -> SyncState.PendingCreate
+            SyncState.PendingWithdraw -> return
+        }
+        incidentRepository.edit(localId, draft.trimmed(), syncState)
+        syncScheduler.schedulePush()
+    }
+
+    /**
+     * Withdraws the incident with [localId]: marks it as a pending withdrawal, which hides it from the list, and
+     * schedules a push. A report that was never sent is then simply deleted; otherwise the server is told
+     * (ADR-0003, ADR-0005). Withdrawing it again does nothing
+     */
+    suspend fun withdraw(localId: Long) {
+        val incident = incidentRepository.getIncident(localId) ?: return
+        if (incident.summary.syncState == SyncState.PendingWithdraw) return
+        incidentRepository.withdraw(localId)
+        syncScheduler.schedulePush()
+    }
+
+    /**
+     * Clears the Status Change Notice of the incident with [localId], once the technician has read it
+     */
+    suspend fun dismissStatusChangeNotice(localId: Long) {
+        incidentRepository.dismissStatusChangeNotice(localId)
     }
 
     /**
@@ -147,6 +204,12 @@ class IncidentInteractor(
     suspend fun discardPhoto(photo: Photo.Local) {
         incidentRepository.deletePhoto(photo)
     }
+
+    private fun IncidentDraft.trimmed(): IncidentDraft = copy(
+        title = title.trim(),
+        description = description.trim(),
+        locationDescription = locationDescription.trim(),
+    )
 
     private suspend fun markingRejectedSession(block: suspend () -> Unit) {
         try {

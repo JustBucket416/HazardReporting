@@ -34,7 +34,9 @@ class SyncSchedulerImplTest {
 
         scheduler.schedulePush()
 
-        verifySequence { workManager.enqueueUniqueWork("sync-once", ExistingWorkPolicy.KEEP, any<OneTimeWorkRequest>()) }
+        verifySequence {
+            workManager.enqueueUniqueWork("sync-once", ExistingWorkPolicy.KEEP, any<OneTimeWorkRequest>())
+        }
 
         // A SyncWorker run once the device is online, backing off exponentially
         val workSpec = request.captured.workSpec

@@ -97,17 +97,151 @@ class IncidentFormViewModelTest {
 
     @Test
     fun testInit_Editing() = runTest {
+        coEvery { incidentInteractor.getDraft(7L) } returns STORED_DRAFT
+
         val viewModel = createViewModel(localId = 7L)
         collectUiState(viewModel)
 
         viewModel.events.test {
             advanceUntilIdle()
 
-            // An edit keeps the incident's original position
+            // An edit keeps the incident's original position, so it never asks for location
             expectNoEvents()
         }
 
-        Truth.assertThat(viewModel.uiState.value.isEditing).isTrue()
+        Truth.assertThat(viewModel.uiState.value).isEqualTo(
+            IncidentFormUiState(
+                isEditing = true,
+                isLoading = false,
+                title = STORED_DRAFT.title,
+                description = STORED_DRAFT.description,
+                categoryId = CATEGORY.id,
+                severityId = SEVERITY.id,
+                siteId = SITE.id,
+                locationDescription = STORED_DRAFT.locationDescription,
+                photos = STORED_DRAFT.photos,
+                categories = listOf(CATEGORY),
+                severities = listOf(SEVERITY),
+                sites = listOf(SITE),
+                position = POSITION,
+                positionStatus = PositionStatus.Captured,
+            )
+        )
+    }
+
+    @Test
+    fun testInit_EditingWithoutPosition() = runTest {
+        coEvery { incidentInteractor.getDraft(7L) } returns STORED_DRAFT.copy(position = null)
+
+        val viewModel = createViewModel(localId = 7L)
+        collectUiState(viewModel)
+        advanceUntilIdle()
+
+        Truth.assertThat(viewModel.uiState.value.position).isNull()
+        Truth.assertThat(viewModel.uiState.value.positionStatus).isEqualTo(PositionStatus.Unavailable)
+    }
+
+    @Test
+    fun testInit_EditingWhileReading() = runTest {
+        val draft = CompletableDeferred<IncidentDraft?>()
+
+        coEvery { incidentInteractor.getDraft(7L) } coAnswers { draft.await() }
+
+        val viewModel = createViewModel(localId = 7L)
+        collectUiState(viewModel)
+        advanceUntilIdle()
+
+        // Nothing to show or save until the incident is read
+        Truth.assertThat(viewModel.uiState.value.isLoading).isTrue()
+        viewModel.onSave()
+        advanceUntilIdle()
+        coVerify(exactly = 0) { incidentInteractor.edit(any(), any()) }
+
+        draft.complete(STORED_DRAFT)
+        advanceUntilIdle()
+
+        Truth.assertThat(viewModel.uiState.value.isLoading).isFalse()
+        Truth.assertThat(viewModel.uiState.value.errors).isEmpty()
+    }
+
+    @Test
+    fun testInit_EditingNotEditable() = runTest {
+        // E.g. withdrawn elsewhere, or its details were never downloaded
+        coEvery { incidentInteractor.getDraft(7L) } returns null
+
+        val viewModel = createViewModel(localId = 7L)
+
+        viewModel.events.test {
+            advanceUntilIdle()
+
+            Truth.assertThat(awaitItem()).isEqualTo(IncidentFormEvent.Closed)
+        }
+    }
+
+    @Test
+    fun testOnSave_Editing() = runTest {
+        coEvery { incidentInteractor.getDraft(7L) } returns STORED_DRAFT
+        coJustRun { incidentInteractor.edit(7L, any()) }
+
+        val viewModel = createViewModel(localId = 7L)
+        advanceUntilIdle()
+
+        viewModel.events.test {
+            viewModel.onTitleChange("Leaking valve, worse")
+            viewModel.onRemovePhoto(REMOTE_PHOTO)
+            viewModel.onSave()
+            advanceUntilIdle()
+
+            Truth.assertThat(awaitItem()).isEqualTo(IncidentFormEvent.Saved)
+        }
+
+        // Saved as an edit of the same incident, with its original position and a server photo removed
+        coVerify(exactly = 1) {
+            incidentInteractor.edit(
+                7L,
+                STORED_DRAFT.copy(title = "Leaking valve, worse", photos = listOf(PHOTO)),
+            )
+        }
+        coVerify(exactly = 0) { incidentInteractor.report(any()) }
+        // A server photo has no file of this form to delete
+        coVerify(exactly = 0) { incidentInteractor.discardPhoto(any()) }
+    }
+
+    @Test
+    fun testOnCloseRequest_EditingUnchanged() = runTest {
+        coEvery { incidentInteractor.getDraft(7L) } returns STORED_DRAFT
+
+        val viewModel = createViewModel(localId = 7L)
+        collectUiState(viewModel)
+        advanceUntilIdle()
+
+        viewModel.events.test {
+            viewModel.onCloseRequest()
+
+            // The stored values aren't unsaved changes
+            Truth.assertThat(awaitItem()).isEqualTo(IncidentFormEvent.Closed)
+        }
+        Truth.assertThat(viewModel.uiState.value.isDiscardDialogVisible).isFalse()
+    }
+
+    @Test
+    fun testEditing_SurvivesProcessDeath() = runTest {
+        coEvery { incidentInteractor.getDraft(7L) } returns STORED_DRAFT
+
+        val viewModel = createViewModel(localId = 7L)
+        advanceUntilIdle()
+        viewModel.onTitleChange("Changed before the process died")
+        advanceUntilIdle()
+
+        // A new ViewModel on the same saved state, as after the process was killed
+        val restored = createViewModel(localId = 7L)
+        collectUiState(restored)
+        advanceUntilIdle()
+
+        // Not read again, which would undo the change
+        coVerify(exactly = 1) { incidentInteractor.getDraft(7L) }
+        Truth.assertThat(restored.uiState.value.title).isEqualTo("Changed before the process died")
+        Truth.assertThat(restored.uiState.value.isLoading).isFalse()
     }
 
     @Test
@@ -628,5 +762,17 @@ class IncidentFormViewModelTest {
         val POSITION = Position(53.5, -2.2, 12.0)
         val OTHER_POSITION = Position(53.6, -2.3, 5.0)
         val PHOTO = Photo.Local("/files/photos/a.jpg")
+        val REMOTE_PHOTO = Photo.Remote("http://10.0.2.2:3001/uploads/b.jpg")
+
+        val STORED_DRAFT = IncidentDraft(
+            title = "Leaking valve",
+            description = "Dripping steadily",
+            categoryId = CATEGORY.id,
+            severityId = SEVERITY.id,
+            siteId = SITE.id,
+            locationDescription = "Pump room B2",
+            position = POSITION,
+            photos = listOf(REMOTE_PHOTO, PHOTO),
+        )
     }
 }

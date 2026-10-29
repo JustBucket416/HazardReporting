@@ -20,6 +20,7 @@ import kotlinx.serialization.json.Json
  * @property isSaveAttempted whether Save was tapped once, after which every error shows
  * @property addedPhotoPaths files this form created, which are deleted if the form is discarded
  * @property pendingCameraPhotoPath file the camera is writing to, or null when no picture is being taken
+ * @property isPrefilled whether an edit form holds the stored incident yet; a new report's form never needs to
  *
  * @author Roman Pliskin on 29.10.2026
  */
@@ -33,6 +34,7 @@ data class IncidentFormState(
     val isSaveAttempted: Boolean = false,
     val addedPhotoPaths: List<String> = emptyList(),
     val pendingCameraPhotoPath: String? = null,
+    val isPrefilled: Boolean = false,
 ) {
 
     /**

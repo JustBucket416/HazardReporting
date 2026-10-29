@@ -227,18 +227,49 @@ class IncidentConverter @Inject constructor(
     )
 
     /**
-     * Converts a draft's [photos] to the photo rows of the incident with [incidentLocalId], keeping their order.
-     * A remote photo's URL is stored relative to the server again, as the server sent it
+     * Returns [entity] with the report fields of the valid, edited [draft]. Its createdAt and sync bookkeeping
+     * stay as they are
+     *
+     * @throws IllegalStateException if the draft has no category, severity or site, which validation rules out
      */
-    fun convertPhotos(incidentLocalId: Long, photos: List<Photo>): List<IncidentPhotoEntity> =
-        photos.mapIndexed { position, photo ->
-            IncidentPhotoEntity(
+    fun withDraft(entity: IncidentEntity, draft: IncidentDraft): IncidentEntity = entity.copy(
+        title = draft.title,
+        categoryId = checkNotNull(draft.categoryId) { "A report needs a category" },
+        severityId = checkNotNull(draft.severityId) { "A report needs a severity" },
+        siteId = checkNotNull(draft.siteId) { "A report needs a site" },
+        description = draft.description,
+        locationDescription = draft.locationDescription,
+        positionLat = draft.position?.lat,
+        positionLng = draft.position?.lng,
+        positionAccuracyM = draft.position?.accuracyM,
+    )
+
+    /**
+     * Converts a draft's [photos] to the photo rows of the incident with [incidentLocalId], keeping their order.
+     * A remote photo's URL is stored relative to the server again, as the server sent it. A local photo that is
+     * among the incident's [storedPhotos] keeps the server URL it got meanwhile, e.g. when an edit form opened
+     * before its upload is saved after it, so it is never uploaded twice nor looked for in its deleted file
+     */
+    fun convertPhotos(
+        incidentLocalId: Long,
+        photos: List<Photo>,
+        storedPhotos: List<IncidentPhotoEntity> = emptyList(),
+    ): List<IncidentPhotoEntity> = photos.mapIndexed { position, photo ->
+        when (photo) {
+            is Photo.Local -> IncidentPhotoEntity(
                 incidentLocalId = incidentLocalId,
                 position = position,
-                localPath = (photo as? Photo.Local)?.path,
-                remoteUrl = (photo as? Photo.Remote)?.url?.let { relativize(it) },
+                localPath = photo.path,
+                remoteUrl = storedPhotos.find { it.localPath == photo.path }?.remoteUrl,
+            )
+            is Photo.Remote -> IncidentPhotoEntity(
+                incidentLocalId = incidentLocalId,
+                position = position,
+                localPath = null,
+                remoteUrl = relativize(photo.url),
             )
         }
+    }
 
     /**
      * Converts a stored incident to its domain [IncidentSummary]

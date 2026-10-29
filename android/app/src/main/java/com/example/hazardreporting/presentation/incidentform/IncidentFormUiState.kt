@@ -11,6 +11,7 @@ import com.example.hazardreporting.domain.model.Site
  * State of the report form
  *
  * @property isEditing whether the form edits an existing incident rather than reporting a new one
+ * @property isLoading whether an edit form is still reading the incident it edits
  * @property title text of the title field
  * @property description text of the description field
  * @property categoryId id of the chosen category, or null
@@ -31,6 +32,7 @@ import com.example.hazardreporting.domain.model.Site
  */
 data class IncidentFormUiState(
     val isEditing: Boolean = false,
+    val isLoading: Boolean = false,
     val title: String = "",
     val description: String = "",
     val categoryId: String? = null,

@@ -427,6 +427,112 @@ class IncidentRepositoryImplTest {
     }
 
     @Test
+    fun testGetIncident() = runTest {
+        val withPhotos = IncidentWithPhotos(SYNCED_ROW, photos = emptyList())
+        val incident = mockk<Incident>()
+
+        coEvery { localDataSource.getIncidentWithPhotos(LOCAL_ID) } returns withPhotos
+        every { converter.convert(withPhotos) } returns incident
+
+        Truth.assertThat(repository.getIncident(LOCAL_ID)).isSameInstanceAs(incident)
+    }
+
+    @Test
+    fun testGetIncident_NotStored() = runTest {
+        coEvery { localDataSource.getIncidentWithPhotos(LOCAL_ID) } returns null
+
+        Truth.assertThat(repository.getIncident(LOCAL_ID)).isNull()
+    }
+
+    @Test
+    fun testEdit() = runTest {
+        val stored = SYNCED_ROW.copy(detailsLoaded = true, localVersion = 2)
+        val draft = mockk<IncidentDraft>()
+        val draftPhotos = listOf(Photo.Local("/files/photos/a.jpg"))
+        val storedPhotos = listOf(mockk<IncidentPhotoEntity>())
+        val edited = SYNCED_ROW.copy(title = "Edited", detailsLoaded = true, localVersion = 2)
+        val photoEntities = listOf(mockk<IncidentPhotoEntity>())
+
+        every { draft.photos } returns draftPhotos
+        coEvery { localDataSource.getIncident(LOCAL_ID) } returns stored
+        coEvery { localDataSource.getPhotos(LOCAL_ID) } returns storedPhotos
+        every { converter.withDraft(stored, draft) } returns edited
+        coJustRun { localDataSource.updateIncident(any()) }
+        every { converter.convertPhotos(LOCAL_ID, draftPhotos, storedPhotos) } returns photoEntities
+        coJustRun { localDataSource.replacePhotos(LOCAL_ID, photoEntities) }
+
+        repository.edit(LOCAL_ID, draft, SyncState.PendingUpdate)
+
+        // One transaction; the version goes up, so a push in flight can't mark it synced
+        coVerifySequence {
+            localDataSource.inTransaction<Unit>(any())
+            localDataSource.getIncident(LOCAL_ID)
+            localDataSource.getPhotos(LOCAL_ID)
+            converter.withDraft(stored, draft)
+            localDataSource.updateIncident(edited.copy(syncState = SyncState.PendingUpdate, localVersion = 3))
+            converter.convertPhotos(LOCAL_ID, draftPhotos, storedPhotos)
+            localDataSource.replacePhotos(LOCAL_ID, photoEntities)
+        }
+    }
+
+    @Test
+    fun testEdit_NotStored() = runTest {
+        coEvery { localDataSource.getIncident(LOCAL_ID) } returns null
+
+        repository.edit(LOCAL_ID, mockk(), SyncState.PendingUpdate)
+
+        coVerifySequence {
+            localDataSource.inTransaction<Unit>(any())
+            localDataSource.getIncident(LOCAL_ID)
+        }
+    }
+
+    @Test
+    fun testWithdraw() = runTest {
+        val stored = SYNCED_ROW.copy(syncState = SyncState.PendingUpdate, localVersion = 4)
+
+        coEvery { localDataSource.getIncident(LOCAL_ID) } returns stored
+        coJustRun { localDataSource.updateIncident(any()) }
+
+        repository.withdraw(LOCAL_ID)
+
+        coVerifySequence {
+            localDataSource.inTransaction<Unit>(any())
+            localDataSource.getIncident(LOCAL_ID)
+            localDataSource.updateIncident(stored.copy(syncState = SyncState.PendingWithdraw, localVersion = 5))
+        }
+    }
+
+    @Test
+    fun testWithdraw_NotStored() = runTest {
+        coEvery { localDataSource.getIncident(LOCAL_ID) } returns null
+
+        repository.withdraw(LOCAL_ID)
+
+        coVerifySequence {
+            localDataSource.inTransaction<Unit>(any())
+            localDataSource.getIncident(LOCAL_ID)
+        }
+    }
+
+    @Test
+    fun testDismissStatusChangeNotice() = runTest {
+        val stored = SYNCED_ROW.copy(statusChangeNoticePending = true, localVersion = 4)
+
+        coEvery { localDataSource.getIncident(LOCAL_ID) } returns stored
+        coJustRun { localDataSource.updateIncident(any()) }
+
+        repository.dismissStatusChangeNotice(LOCAL_ID)
+
+        // Not a change to send, so the version stays
+        coVerifySequence {
+            localDataSource.inTransaction<Unit>(any())
+            localDataSource.getIncident(LOCAL_ID)
+            localDataSource.updateIncident(stored.copy(statusChangeNoticePending = false))
+        }
+    }
+
+    @Test
     fun testCreatePhotoFile() = runTest {
         every { photoLocalDataSource.createPhotoFile() } returns "/files/photos/a.jpg"
 

@@ -32,7 +32,8 @@ import kotlinx.coroutines.plus
 
 /**
  * Manages the incident detail screen's state. Opening the screen downloads the incident's details only if
- * they were never downloaded; pull-to-refresh downloads them again (ADR-0006)
+ * they were never downloaded; pull-to-refresh downloads them again (ADR-0006). Withdrawing asks for confirmation
+ * first and then leaves the screen. A Status Change Notice shows as soon as a push stores it, until dismissed
  *
  * @param savedStateHandle holds the route with the incident's local id
  * @property incidentInteractor used for observing the incident and downloading its details
@@ -52,6 +53,7 @@ class IncidentDetailViewModel @Inject constructor(
 
     private val localId = savedStateHandle.toRoute<IncidentDetail>().localId
     private val loadStatus = MutableStateFlow(LoadStatus())
+    private val isWithdrawDialogVisible = MutableStateFlow(false)
     private val _events = Channel<IncidentDetailEvent>(Channel.BUFFERED)
 
     /**
@@ -59,12 +61,16 @@ class IncidentDetailViewModel @Inject constructor(
      */
     val uiState: StateFlow<IncidentDetailUiState> = combine(
         incidentInteractor.observeIncident(localId),
-        catalogInteractor.observeCategories(),
-        catalogInteractor.observeSeverities(),
-        catalogInteractor.observeSites(),
+        combine(
+            catalogInteractor.observeCategories(),
+            catalogInteractor.observeSeverities(),
+            catalogInteractor.observeSites(),
+            ::Catalog,
+        ),
         loadStatus,
-    ) { incident, categories, severities, sites, load ->
-        toUiState(incident, categories, severities, sites, load)
+        isWithdrawDialogVisible,
+    ) { incident, catalog, load, isWithdrawDialogVisible ->
+        toUiState(incident, catalog, load, isWithdrawDialogVisible)
     }.stateIn(
         scope = viewModelScope + exceptionHandler + dispatchers.default,
         started = SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS),
@@ -95,6 +101,40 @@ class IncidentDetailViewModel @Inject constructor(
         load(LoadKind.Refresh)
     }
 
+    /**
+     * Asks "Withdraw this report?" after the technician picked Withdraw… in the ⋮ menu
+     */
+    fun onWithdrawClick() {
+        isWithdrawDialogVisible.update { true }
+    }
+
+    /**
+     * Closes "Withdraw this report?" without withdrawing
+     */
+    fun onWithdrawDismiss() {
+        isWithdrawDialogVisible.update { false }
+    }
+
+    /**
+     * Withdraws the incident on the device, which never waits for the network, and leaves the screen
+     */
+    fun onWithdrawConfirm() {
+        isWithdrawDialogVisible.update { false }
+        viewModelScope.launch(exceptionHandler + dispatchers.default) {
+            incidentInteractor.withdraw(localId)
+            _events.send(IncidentDetailEvent.Withdrawn)
+        }
+    }
+
+    /**
+     * Clears the Status Change Notice once the technician has read it
+     */
+    fun onDismissStatusChangeNotice() {
+        viewModelScope.launch(exceptionHandler + dispatchers.default) {
+            incidentInteractor.dismissStatusChangeNotice(localId)
+        }
+    }
+
     override fun onUnexpected(throwable: Throwable) {
         loadStatus.update { if (it.inFlight != null) LoadStatus(hasFailed = true) else it }
         _events.trySend(IncidentDetailEvent.UnexpectedError)
@@ -111,7 +151,7 @@ class IncidentDetailViewModel @Inject constructor(
             } catch (e: NoConnectionException) {
                 false
             } catch (e: UnauthorizedException) {
-                // The session-invalid banner replaces this with the synchroniser (issue 13)
+                // The interactor marked the session as invalid, which the list explains
                 false
             }
 
@@ -127,10 +167,9 @@ class IncidentDetailViewModel @Inject constructor(
 
     private fun toUiState(
         incident: Incident,
-        categories: List<Category>,
-        severities: List<Severity>,
-        sites: List<Site>,
+        catalog: Catalog,
         load: LoadStatus,
+        isWithdrawDialogVisible: Boolean,
     ): IncidentDetailUiState {
         val summary = incident.summary
         val details = when {
@@ -141,15 +180,33 @@ class IncidentDetailViewModel @Inject constructor(
         val content = IncidentDetailContent(
             title = summary.title,
             status = summary.status,
-            severity = severities.find { it.id == summary.severityId },
-            categoryName = categories.find { it.id == summary.categoryId }?.name,
-            siteName = sites.find { it.id == summary.siteId }?.name,
+            severity = catalog.severities.find { it.id == summary.severityId },
+            categoryName = catalog.categories.find { it.id == summary.categoryId }?.name,
+            siteName = catalog.sites.find { it.id == summary.siteId }?.name,
             createdAt = summary.createdAt,
             isPending = summary.syncState != SyncState.Synced,
+            hasStatusChangeNotice = summary.hasStatusChangeNotice,
             details = details,
         )
-        return IncidentDetailUiState(incident = content, isRefreshing = load.inFlight == LoadKind.Refresh)
+        return IncidentDetailUiState(
+            incident = content,
+            isRefreshing = load.inFlight == LoadKind.Refresh,
+            isWithdrawDialogVisible = isWithdrawDialogVisible,
+        )
     }
+
+    /**
+     * The stored catalog the incident is named from
+     *
+     * @property categories the stored categories
+     * @property severities the stored severities
+     * @property sites the stored sites
+     */
+    private data class Catalog(
+        val categories: List<Category>,
+        val severities: List<Severity>,
+        val sites: List<Site>,
+    )
 
     /**
      * What the screen knows about downloading the details

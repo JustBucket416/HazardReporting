@@ -4,6 +4,7 @@ import com.example.hazardreporting.domain.model.Incident
 import com.example.hazardreporting.domain.model.IncidentDraft
 import com.example.hazardreporting.domain.model.IncidentSummary
 import com.example.hazardreporting.domain.model.Photo
+import com.example.hazardreporting.domain.model.SyncState
 import kotlinx.coroutines.flow.Flow
 
 /**
@@ -46,11 +47,34 @@ interface IncidentRepository {
     suspend fun loadDetails(localId: Long, force: Boolean)
 
     /**
+     * Returns the stored incident with [localId], with its details if they are downloaded, or null if there is none
+     */
+    suspend fun getIncident(localId: Long): Incident?
+
+    /**
      * Stores a new incident from the valid [draft] as a pending report, with its createdAt set to now
      *
      * @return the new incident's local id
      */
     suspend fun report(draft: IncidentDraft): Long
+
+    /**
+     * Replaces the report fields and photos of the incident with [localId] with those of the valid [draft],
+     * keeping its createdAt, and moves it to [syncState]. Increments its local version, so a push already in flight
+     * doesn't mark it synced (ADR-0002). Does nothing if no such incident is stored
+     */
+    suspend fun edit(localId: Long, draft: IncidentDraft, syncState: SyncState)
+
+    /**
+     * Marks the incident with [localId] as withdrawn on the device, a pending withdrawal, and increments its
+     * local version. Does nothing if no such incident is stored
+     */
+    suspend fun withdraw(localId: Long)
+
+    /**
+     * Clears the Status Change Notice of the incident with [localId], once the technician has read it
+     */
+    suspend fun dismissStatusChangeNotice(localId: Long)
 
     /**
      * Creates a path for a new photo in the app's private photo storage, for the camera to write to.

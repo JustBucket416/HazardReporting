@@ -500,6 +500,79 @@ class IncidentConverterTest {
         ).inOrder()
     }
 
+    @Test
+    fun testWithDraft() {
+        val pending = STORED_ENTITY.copy(syncState = SyncState.PendingCreate, localVersion = 2)
+        val draft = IncidentDraft(
+            title = "Leaking valve",
+            description = "Dripping steadily",
+            categoryId = "cat-plumbing",
+            severityId = "sev-medium",
+            siteId = "site-depot",
+            locationDescription = "Pump room B2",
+            position = Position(53.6, -2.3, 5.0),
+            photos = emptyList(),
+        )
+
+        val entity = converter.withDraft(pending, draft)
+
+        // The report fields change; createdAt and the sync bookkeeping stay
+        Truth.assertThat(entity).isEqualTo(
+            pending.copy(
+                title = "Leaking valve",
+                categoryId = "cat-plumbing",
+                severityId = "sev-medium",
+                siteId = "site-depot",
+                description = "Dripping steadily",
+                locationDescription = "Pump room B2",
+                positionLat = 53.6,
+                positionLng = -2.3,
+                positionAccuracyM = 5.0,
+            )
+        )
+    }
+
+    @Test
+    fun testWithDraft_WithoutPosition() {
+        val draft = IncidentDraft("Title", "", "cat", "sev", "site", "", position = null, photos = emptyList())
+
+        val entity = converter.withDraft(STORED_ENTITY, draft)
+
+        Truth.assertThat(entity.positionLat).isNull()
+        Truth.assertThat(entity.positionLng).isNull()
+        Truth.assertThat(entity.positionAccuracyM).isNull()
+    }
+
+    @Test
+    fun testConvertDraftPhotos_KeepsUrlsUploadedMeanwhile() {
+        val stored = listOf(
+            photoRow(localPath = "/files/photos/a.jpg", remoteUrl = REMOTE_A),
+            photoRow(localPath = "/files/photos/c.jpg", remoteUrl = null),
+        )
+
+        val photos = converter.convertPhotos(
+            LOCAL_ID,
+            listOf(Photo.Local("/files/photos/a.jpg"), Photo.Local("/files/photos/b.jpg")),
+            stored,
+        )
+
+        // Opened before the upload, saved after it: the uploaded photo keeps its URL; a new one has none yet
+        Truth.assertThat(photos).containsExactly(
+            IncidentPhotoEntity(
+                incidentLocalId = LOCAL_ID,
+                position = 0,
+                localPath = "/files/photos/a.jpg",
+                remoteUrl = REMOTE_A,
+            ),
+            IncidentPhotoEntity(
+                incidentLocalId = LOCAL_ID,
+                position = 1,
+                localPath = "/files/photos/b.jpg",
+                remoteUrl = null,
+            ),
+        ).inOrder()
+    }
+
     private fun photoRow(localPath: String?, remoteUrl: String?) = IncidentPhotoEntity(
         id = 1,
         incidentLocalId = LOCAL_ID,
