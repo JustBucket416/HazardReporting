@@ -18,3 +18,7 @@ The `/incidents` page, per spec § 2:
 - [ ] The summary counts match the seed data.
 
 Refs: spec § 2
+
+## Comments
+
+- Implemented on branch worktree-agent-a672c1bf8e15d2851; verified against the running server.
