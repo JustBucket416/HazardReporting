@@ -24,3 +24,7 @@ Blocked by: 11, 13
 - [ ] Interactor and synchronizer tests cover every `syncState` transition.
 
 Refs: ADR-0004, ADR-0005
+
+## Comments
+
+- Implemented on feat/android-app in d0ebcb1; unit tests green.

@@ -33,3 +33,7 @@ Blocked by: 02, 04, 12
 - [ ] Running `npm run reset` while the app holds a token shows the banner, and no data is lost.
 
 Refs: ADR-0002, ADR-0003, ADR-0004
+
+## Comments
+
+- Implemented on feat/android-app in 1c846ac; unit tests green.
