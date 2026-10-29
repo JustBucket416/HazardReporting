@@ -21,3 +21,7 @@ Blocked by: 10
 - [ ] Repository tests cover every combination of `force` and `detailsLoaded`.
 
 Refs: ADR-0006
+
+## Comments
+
+- Implemented on feat/android-app in f9d5423; unit tests green.

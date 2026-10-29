@@ -28,3 +28,7 @@ Blocked by: 08, 09
 - [ ] Repository tests cover the pull rule on pending rows. ViewModel tests cover every state.
 
 Refs: ADR-0006
+
+## Comments
+
+- Implemented on feat/android-app in 4aa5c9e; unit tests green.
