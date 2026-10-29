@@ -98,7 +98,7 @@ Every 4xx response carries `{ "error": "<message>", "fields"?: { "<field>": "<me
 ### Technician routes
 | Route | Behaviour |
 |---|---|
-| `GET /incidents/summary` | The caller's incidents, excluding `withdrawn`, newest `createdAt` first. Each item is `{ id, title, categoryId, severityId, status, createdAt, updatedAt }`. |
+| `GET /incidents/summary` | The caller's incidents, excluding `withdrawn`, newest `createdAt` first. Each item is `{ id, title, categoryId, severityId, siteId, status, createdAt, updatedAt }`. |
 | `GET /incidents/:id` | The full incident with **`assignee` and `notes` removed**. **404** if it doesn't exist or isn't the caller's. |
 | `POST /incidents` | Body: `{ title, description, categoryId, severityId, siteId, locationDescription, position, photoUrls, createdAt }`. The server sets `reporterId` from the token, plus `status: "open"`, `priority: null`, `assignee: null`, `notes: []`, `receivedAt` and `updatedAt`. **Dedupe** ([ADR-0003](../../docs/adr/0003-create-dedupe-by-reporter-and-created-at.md)): if an incident already has the same `reporterId` and `createdAt`, the server updates its report fields instead of inserting. **Both cases return 200** with the incident (technician view). **400** if validation fails. |
 | `PATCH /incidents/:id` | Accepts either a subset of the report fields (no `createdAt`) or exactly `{ status: "withdrawn" }`. **409** if the current status isn't `open`. **400** if any other field is present. **404** if the incident isn't the caller's. Returns 200 with the incident (technician view). |
@@ -190,7 +190,7 @@ in_progress  → resolved     | rejected
 
 ### 3.2 Domain (`domain`)
 - **Models:**
-  - `IncidentSummary(localId, serverId?, title, categoryId, severityId, status, createdAt, syncState, hasStatusChangeNotice)`
+  - `IncidentSummary(localId, serverId?, title, categoryId, severityId, siteId, status, createdAt, syncState, hasStatusChangeNotice)`
   - `Incident(summary, details: IncidentDetails?)`
   - `IncidentDetails(description, siteId, locationDescription, position?, photos: List<Photo>, priority?)`
   - `Photo` is either a local file or a remote URL.

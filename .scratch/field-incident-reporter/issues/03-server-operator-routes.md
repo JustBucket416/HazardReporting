@@ -25,3 +25,7 @@ Blocked by: 01
 - [ ] `GET /users` never includes `password`.
 
 Refs: spec § 1, ADR-0004
+
+## Comments
+
+- Implemented on branch worktree-agent-a3e3d6de7f949a127; verified by npm test.

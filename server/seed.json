@@ -1,0 +1,192 @@
+{
+  "users": [
+    { "id": "u-tech1", "email": "tech1@example.com", "password": "password", "name": "Alex Turner", "role": "technician" },
+    { "id": "u-tech2", "email": "tech2@example.com", "password": "password", "name": "Sam Rivera", "role": "technician" },
+    { "id": "u-ops", "email": "ops@example.com", "password": "password", "name": "Morgan Lee", "role": "operator" }
+  ],
+  "sessions": [],
+  "categories": [
+    { "id": "cat-equipment", "name": "Equipment" },
+    { "id": "cat-electrical", "name": "Electrical" },
+    { "id": "cat-plumbing", "name": "Plumbing" },
+    { "id": "cat-hvac", "name": "HVAC" },
+    { "id": "cat-structural", "name": "Structural" },
+    { "id": "cat-road-grounds", "name": "Road/Grounds Hazard" },
+    { "id": "cat-other", "name": "Other" }
+  ],
+  "severities": [
+    { "id": "sev-low", "name": "Low", "rank": 1 },
+    { "id": "sev-medium", "name": "Medium", "rank": 2 },
+    { "id": "sev-high", "name": "High", "rank": 3 },
+    { "id": "sev-critical", "name": "Critical", "rank": 4 }
+  ],
+  "sites": [
+    { "id": "site-north-plant", "name": "North Plant", "lat": 53.5058, "lng": -2.201 },
+    { "id": "site-depot-a", "name": "Depot A", "lat": 53.4631, "lng": -2.2913 },
+    { "id": "site-hq-campus", "name": "HQ Campus", "lat": 53.4723, "lng": -2.2389 }
+  ],
+  "incidents": [
+    {
+      "id": "inc-0001",
+      "reporterId": "u-tech1",
+      "title": "Air handler rattling on roof",
+      "description": "AHU-2 on the east roof makes a loud rattle when the fan ramps up. Audible from the meeting rooms below.",
+      "categoryId": "cat-hvac",
+      "severityId": "sev-low",
+      "siteId": "site-hq-campus",
+      "locationDescription": "East roof, AHU-2",
+      "position": { "lat": 53.47251, "lng": -2.23842, "accuracyM": 8 },
+      "photoUrls": ["/uploads/seed/photo-01.png"],
+      "status": "resolved",
+      "priority": "low",
+      "assignee": "HVAC crew",
+      "notes": [
+        { "at": 1791880800000, "byUserId": "u-ops", "text": "Assigned to HVAC crew for inspection." },
+        { "at": 1792050000000, "byUserId": "u-ops", "text": "Loose fan mount tightened; noise gone." }
+      ],
+      "createdAt": 1791790800000,
+      "receivedAt": 1791790860000,
+      "updatedAt": 1792050000000
+    },
+    {
+      "id": "inc-0002",
+      "reporterId": "u-tech2",
+      "title": "Crack in car park wall",
+      "description": "Diagonal crack about 40 cm long in the retaining wall next to bay 12.",
+      "categoryId": "cat-structural",
+      "severityId": "sev-medium",
+      "siteId": "site-hq-campus",
+      "locationDescription": "Car park, bay 12",
+      "position": { "lat": 53.47188, "lng": -2.23977, "accuracyM": 12 },
+      "photoUrls": ["/uploads/seed/photo-02.png", "/uploads/seed/photo-03.png"],
+      "status": "rejected",
+      "priority": null,
+      "assignee": null,
+      "notes": [
+        { "at": 1792055700000, "byUserId": "u-ops", "text": "Hairline crack, cosmetic only; already logged in the annual structural survey." }
+      ],
+      "createdAt": 1791969300000,
+      "receivedAt": 1791969330000,
+      "updatedAt": 1792055700000
+    },
+    {
+      "id": "inc-0003",
+      "reporterId": "u-tech1",
+      "title": "Exposed wiring at panel E4",
+      "description": "Cover of distribution panel E4 is missing and live conductors are exposed at shoulder height.",
+      "categoryId": "cat-electrical",
+      "severityId": "sev-critical",
+      "siteId": "site-north-plant",
+      "locationDescription": "Hall 2, column E4",
+      "position": { "lat": 53.50612, "lng": -2.20154, "accuracyM": 15 },
+      "photoUrls": ["/uploads/seed/photo-04.png", "/uploads/seed/photo-05.png", "/uploads/seed/photo-06.png"],
+      "status": "in_progress",
+      "priority": "urgent",
+      "assignee": "Electrical team",
+      "notes": [
+        { "at": 1792159500000, "byUserId": "u-ops", "text": "Area cordoned off; panel isolated." },
+        { "at": 1792170300000, "byUserId": "u-ops", "text": "Electrical team on site, fitting a replacement cover." }
+      ],
+      "createdAt": 1792155900000,
+      "receivedAt": 1792155945000,
+      "updatedAt": 1792170300000
+    },
+    {
+      "id": "inc-0004",
+      "reporterId": "u-tech2",
+      "title": "Burst pipe in wash bay",
+      "description": "Water spraying from a split pipe behind the pressure washer. Floor is flooding slowly.",
+      "categoryId": "cat-plumbing",
+      "severityId": "sev-high",
+      "siteId": "site-depot-a",
+      "locationDescription": "Vehicle wash bay, rear wall",
+      "position": { "lat": 53.46289, "lng": -2.29104, "accuracyM": 20 },
+      "photoUrls": ["/uploads/seed/photo-07.png"],
+      "status": "in_progress",
+      "priority": "high",
+      "assignee": "Plumbing crew",
+      "notes": [
+        { "at": 1792320600000, "byUserId": "u-ops", "text": "Plumbing crew dispatched." }
+      ],
+      "createdAt": 1792306200000,
+      "receivedAt": 1792306500000,
+      "updatedAt": 1792320600000
+    },
+    {
+      "id": "inc-0005",
+      "reporterId": "u-tech1",
+      "title": "Leaking valve in pump room",
+      "description": "Gate valve V-12 drips steadily from the gland. A bucket is under it for now.",
+      "categoryId": "cat-plumbing",
+      "severityId": "sev-medium",
+      "siteId": "site-depot-a",
+      "locationDescription": "Pump room B2",
+      "position": { "lat": 53.46337, "lng": -2.29178, "accuracyM": 25 },
+      "photoUrls": ["/uploads/seed/photo-08.png"],
+      "status": "acknowledged",
+      "priority": "medium",
+      "assignee": null,
+      "notes": [],
+      "createdAt": 1792492200000,
+      "receivedAt": 1792492230000,
+      "updatedAt": 1792506600000
+    },
+    {
+      "id": "inc-0006",
+      "reporterId": "u-tech1",
+      "title": "Flickering light in lobby",
+      "description": "Ceiling panel light by the reception desk flickers.",
+      "categoryId": "cat-other",
+      "severityId": "sev-low",
+      "siteId": "site-hq-campus",
+      "locationDescription": "Main lobby",
+      "position": null,
+      "photoUrls": ["/uploads/seed/photo-09.png"],
+      "status": "withdrawn",
+      "priority": null,
+      "assignee": null,
+      "notes": [],
+      "createdAt": 1792656600000,
+      "receivedAt": 1792656620000,
+      "updatedAt": 1792660200000
+    },
+    {
+      "id": "inc-0007",
+      "reporterId": "u-tech2",
+      "title": "Deep pothole at gate 2",
+      "description": "Pothole roughly 1 m wide and 15 cm deep right at the entrance of gate 2. Trucks swerve around it.",
+      "categoryId": "cat-road-grounds",
+      "severityId": "sev-critical",
+      "siteId": "site-depot-a",
+      "locationDescription": "Gate 2 entrance",
+      "position": { "lat": 53.46402, "lng": -2.28977, "accuracyM": 6 },
+      "photoUrls": ["/uploads/seed/photo-10.png", "/uploads/seed/photo-02.png"],
+      "status": "open",
+      "priority": null,
+      "assignee": null,
+      "notes": [],
+      "createdAt": 1792855200000,
+      "receivedAt": 1792855210000,
+      "updatedAt": 1792855210000
+    },
+    {
+      "id": "inc-0008",
+      "reporterId": "u-tech1",
+      "title": "Conveyor belt 3 fraying",
+      "description": "The edge of conveyor belt 3 is fraying over about two metres near the transfer point.",
+      "categoryId": "cat-equipment",
+      "severityId": "sev-high",
+      "siteId": "site-north-plant",
+      "locationDescription": "Line 3 transfer point",
+      "position": { "lat": 53.50534, "lng": -2.20063, "accuracyM": 10 },
+      "photoUrls": ["/uploads/seed/photo-05.png", "/uploads/seed/photo-01.png"],
+      "status": "open",
+      "priority": null,
+      "assignee": null,
+      "notes": [],
+      "createdAt": 1793015100000,
+      "receivedAt": 1793015160000,
+      "updatedAt": 1793015160000
+    }
+  ]
+}

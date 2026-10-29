@@ -25,3 +25,7 @@ Create `server/` with:
 - [ ] `reset` invalidates all tokens.
 
 Refs: spec § 1, ADR-0001
+
+## Comments
+
+- Implemented on branch worktree-agent-a3e3d6de7f949a127; verified by npm test.
