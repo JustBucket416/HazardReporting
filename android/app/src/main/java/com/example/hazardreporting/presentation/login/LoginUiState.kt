@@ -6,8 +6,8 @@ package com.example.hazardreporting.presentation.login
  * @property email text of the email field
  * @property password text of the password field
  * @property isSigningIn whether a sign-in request is in flight
- * @property error why the last sign-in failed, shown under the password field; one about the account also marks
- * the email field
+ * @property error why the last sign-in failed. One about the account marks both fields and is shown under the
+ * password field; any other is shown under the sign-in button
  *
  * @author Roman Pliskin on 29.10.2026
  */

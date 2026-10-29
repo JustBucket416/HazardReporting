@@ -23,7 +23,7 @@
     <string name="login_sign_in">Sign in</string>
     <string name="login_signing_in">Signing in…</string>
     <string name="login_error_invalid_credentials">Invalid email or password</string>
-    <string name="login_error_no_connection">No connection</string>
+    <string name="login_error_no_connection">Can\'t reach the server. Check your connection and try again.</string>
     <string name="login_error_not_technician">Technicians only</string>
 
     <!-- Logout -->

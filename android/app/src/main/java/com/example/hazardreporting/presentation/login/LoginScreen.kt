@@ -31,9 +31,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -132,6 +136,10 @@ private fun LoginForm(
     onPasswordChange: (String) -> Unit,
     onSubmit: () -> Unit,
 ) {
+    // An account error is about what was typed, so it marks the fields; any other is shown on its own
+    val accountError = uiState.error?.takeIf { it.isAboutAccount }
+    val otherError = uiState.error?.takeUnless { it.isAboutAccount }
+
     Column(
         modifier = Modifier
             .widthIn(max = FORM_MAX_WIDTH)
@@ -151,7 +159,7 @@ private fun LoginForm(
             enabled = !uiState.isSigningIn,
             label = { Text(stringResource(R.string.login_email)) },
             // The message itself is shown once, under the password field
-            isError = uiState.error?.isAboutAccount == true,
+            isError = accountError != null,
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email, imeAction = ImeAction.Next),
             singleLine = true,
         )
@@ -161,18 +169,25 @@ private fun LoginForm(
             modifier = Modifier.fillMaxWidth(),
             enabled = !uiState.isSigningIn,
             label = { Text(stringResource(R.string.login_password)) },
-            supportingText = if (uiState.error != null) {
-                { Text(uiState.error.message()) }
-            } else {
-                null
-            },
-            isError = uiState.error != null,
+            supportingText = accountError?.let { error -> { Text(error.message()) } },
+            isError = accountError != null,
             visualTransformation = PasswordVisualTransformation(),
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Go),
             keyboardActions = KeyboardActions(onGo = { onSubmit() }),
             singleLine = true,
         )
         SignInButton(isSigningIn = uiState.isSigningIn, onClick = onSubmit)
+        if (otherError != null) {
+            Text(
+                text = otherError.message(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .semantics { liveRegion = LiveRegionMode.Polite },
+                color = MaterialTheme.colorScheme.error,
+                textAlign = TextAlign.Center,
+                style = MaterialTheme.typography.bodyMedium,
+            )
+        }
     }
 }
 
@@ -224,6 +239,15 @@ private fun LoginScreenSigningInPreview() {
 private fun LoginScreenErrorPreview() {
     LoginScreenPreviewContent(
         LoginUiState(email = "tech1@example.com", password = "wrong", error = LoginError.InvalidCredentials)
+    )
+}
+
+@Preview(name = "No connection, light")
+@Preview(name = "No connection, dark", uiMode = Configuration.UI_MODE_NIGHT_YES)
+@Composable
+private fun LoginScreenNoConnectionPreview() {
+    LoginScreenPreviewContent(
+        LoginUiState(email = "tech1@example.com", password = "password", error = LoginError.NoConnection)
     )
 }
 
