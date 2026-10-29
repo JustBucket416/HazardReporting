@@ -649,6 +649,22 @@ class IncidentFormViewModelTest {
     }
 
     @Test
+    fun testFormState_TextChangesWithoutDispatching() = runTest {
+        val viewModel = createViewModel()
+
+        // Keystrokes typed faster than the dispatcher runs must all reach the text fields, in order
+        viewModel.onTitleChange("B")
+        viewModel.onTitleChange("Br")
+        viewModel.onDescriptionChange("Rail")
+        viewModel.onLocationDescriptionChange("Dock 2")
+
+        val fields = viewModel.formState.value.fields
+        Truth.assertThat(fields.title).isEqualTo("Br")
+        Truth.assertThat(fields.description).isEqualTo("Rail")
+        Truth.assertThat(fields.locationDescription).isEqualTo("Dock 2")
+    }
+
+    @Test
     fun testOnCloseRequest_NoChanges() = runTest {
         coEvery { incidentInteractor.capturePosition() } returns POSITION
 

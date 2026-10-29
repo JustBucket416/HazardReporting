@@ -22,6 +22,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.getAndUpdate
 import kotlinx.coroutines.flow.receiveAsFlow
@@ -86,6 +87,13 @@ class IncidentFormViewModel @Inject constructor(
         started = SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS),
         initialValue = IncidentFormUiState(isEditing = isEditing, isLoading = isEditing),
     )
+
+    /**
+     * The form as the technician edits it. The text fields read their text from here rather than from [uiState]:
+     * [uiState] is built on the Default dispatcher, and a text field that gets its text back after a thread hop
+     * drops keystrokes typed in between
+     */
+    val formState: StateFlow<IncidentFormState> = form.asStateFlow()
 
     /**
      * One-off events of the report form
