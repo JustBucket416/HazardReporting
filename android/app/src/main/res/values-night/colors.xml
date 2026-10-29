@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Matches the Compose theme's dark background, so no other colour shows before the first frame -->
+    <color name="window_background">#FF111318</color>
+</resources>

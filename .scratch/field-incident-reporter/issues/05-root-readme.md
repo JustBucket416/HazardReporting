@@ -18,3 +18,7 @@ Root `README.md` covering:
 - [ ] Someone starting from a fresh clone can follow the README through to the end of the demo script.
 
 Refs: spec "Acceptance"
+
+## Comments
+
+- Implemented on feat/android-app; demo script verified end to end on an API 36 emulator.

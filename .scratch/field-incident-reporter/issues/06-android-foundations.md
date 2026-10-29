@@ -28,3 +28,7 @@ Prepare the template for the rest of the app (spec § 3.1):
 - [ ] A shimmer preview renders in both light and dark.
 
 Refs: ADR-0008, ADR-0009
+
+## Comments
+
+- Implemented on feat/android-app in 1e47342; unit tests green.

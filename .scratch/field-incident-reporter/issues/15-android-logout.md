@@ -25,3 +25,7 @@ Blocked by: 13
 - [ ] Interactor tests check the wipe order with `coVerifyOrder`.
 
 Refs: ADR-0007
+
+## Comments
+
+- Implemented on feat/android-app in 39bf68d; unit tests green.

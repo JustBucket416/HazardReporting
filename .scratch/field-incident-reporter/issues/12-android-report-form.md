@@ -31,3 +31,7 @@ Blocked by: 09, 10
 - [ ] Interactor validation tests cover every rule.
 
 Refs: spec § 3.2, § 3.5
+
+## Comments
+
+- Implemented on feat/android-app in a30a61f; unit tests green.

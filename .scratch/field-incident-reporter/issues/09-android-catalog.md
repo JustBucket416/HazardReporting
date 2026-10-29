@@ -17,3 +17,7 @@ Blocked by: 07
 - [ ] Converter and repository unit tests pass.
 
 Refs: spec § 3.2–3.3
+
+## Comments
+
+- Implemented on feat/android-app in 6a3ddcf; unit tests green.

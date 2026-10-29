@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Directories the app's FileProvider shares: only the private photo storage the camera writes to -->
+<paths>
+    <files-path
+        name="photos"
+        path="photos/" />
+</paths>

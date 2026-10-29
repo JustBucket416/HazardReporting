@@ -21,3 +21,7 @@ Blocked by: 07
 - [ ] `LoginViewModel` tests cover success, invalid credentials, no connection, and an unexpected exception (it is logged and loading is cleared).
 
 Refs: spec § 3.5
+
+## Comments
+
+- Implemented on feat/android-app in 87c5569 (follow-up 56af9fc); unit tests green.

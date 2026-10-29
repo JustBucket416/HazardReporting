@@ -31,3 +31,7 @@ Blocked by: 06
 - [ ] `AuthInterceptor` adds the header only when there is a token and the request isn't to `/login`.
 
 Refs: ADR-0010, ADR-0009
+
+## Comments
+
+- Implemented on feat/android-app in 05ed370; unit tests green.
