@@ -2,6 +2,7 @@ package com.example.hazardreporting.di
 
 import androidx.lifecycle.ViewModel
 import com.example.hazardreporting.presentation.MainViewModel
+import com.example.hazardreporting.presentation.incidentlist.IncidentListViewModel
 import com.example.hazardreporting.presentation.login.LoginViewModel
 import dagger.Binds
 import dagger.Module
@@ -30,4 +31,12 @@ interface ViewModelModule {
     @IntoMap
     @ViewModelKey(LoginViewModel::class)
     fun bindLoginViewModel(viewModel: LoginViewModel): ViewModel
+
+    /**
+     * Binds [IncidentListViewModel] into the ViewModel map
+     */
+    @Binds
+    @IntoMap
+    @ViewModelKey(IncidentListViewModel::class)
+    fun bindIncidentListViewModel(viewModel: IncidentListViewModel): ViewModel
 }

@@ -39,7 +39,7 @@ class MainViewModel @Inject constructor(
 
     init {
         viewModelScope.launch(exceptionHandler + dispatchers.default) {
-            val startDestination = if (loginInteractor.currentUser() != null) IncidentList else Login
+            val startDestination = if (loginInteractor.currentUser() != null) IncidentList() else Login
             _uiState.update { it.copy(startDestination = startDestination) }
         }
     }

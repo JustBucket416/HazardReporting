@@ -5,6 +5,7 @@ import androidx.room.Room
 import com.example.hazardreporting.data.catalog.dao.CategoryDao
 import com.example.hazardreporting.data.catalog.dao.SeverityDao
 import com.example.hazardreporting.data.catalog.dao.SiteDao
+import com.example.hazardreporting.data.incident.dao.IncidentDao
 import com.example.hazardreporting.data.local.HazardReportingDatabase
 import dagger.Module
 import dagger.Provides
@@ -45,4 +46,10 @@ object DatabaseModule {
      */
     @Provides
     fun provideSiteDao(database: HazardReportingDatabase): SiteDao = database.siteDao()
+
+    /**
+     * Provides the DAO of the `incidents` table
+     */
+    @Provides
+    fun provideIncidentDao(database: HazardReportingDatabase): IncidentDao = database.incidentDao()
 }

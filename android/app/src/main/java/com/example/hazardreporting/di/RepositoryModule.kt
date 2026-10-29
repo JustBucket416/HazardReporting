@@ -1,8 +1,10 @@
 package com.example.hazardreporting.di
 
 import com.example.hazardreporting.data.catalog.CatalogRepositoryImpl
+import com.example.hazardreporting.data.incident.IncidentRepositoryImpl
 import com.example.hazardreporting.data.session.SessionRepositoryImpl
 import com.example.hazardreporting.domain.repository.CatalogRepository
+import com.example.hazardreporting.domain.repository.IncidentRepository
 import com.example.hazardreporting.domain.repository.SessionRepository
 import dagger.Binds
 import dagger.Module
@@ -26,4 +28,10 @@ interface RepositoryModule {
      */
     @Binds
     fun bindCatalogRepository(repository: CatalogRepositoryImpl): CatalogRepository
+
+    /**
+     * Binds [IncidentRepositoryImpl] as the [IncidentRepository]
+     */
+    @Binds
+    fun bindIncidentRepository(repository: IncidentRepositoryImpl): IncidentRepository
 }

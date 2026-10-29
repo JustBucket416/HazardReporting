@@ -8,6 +8,9 @@ import com.example.hazardreporting.data.catalog.dao.SiteDao
 import com.example.hazardreporting.data.catalog.entity.CategoryEntity
 import com.example.hazardreporting.data.catalog.entity.SeverityEntity
 import com.example.hazardreporting.data.catalog.entity.SiteEntity
+import com.example.hazardreporting.data.incident.dao.IncidentDao
+import com.example.hazardreporting.data.incident.entity.IncidentEntity
+import com.example.hazardreporting.data.incident.entity.IncidentPhotoEntity
 
 /**
  * The app's Room database, the source of truth for everything shown offline (ADR-0002)
@@ -19,6 +22,8 @@ import com.example.hazardreporting.data.catalog.entity.SiteEntity
         CategoryEntity::class,
         SeverityEntity::class,
         SiteEntity::class,
+        IncidentEntity::class,
+        IncidentPhotoEntity::class,
     ],
     version = 1,
 )
@@ -38,4 +43,9 @@ abstract class HazardReportingDatabase : RoomDatabase() {
      * Returns the DAO of the `sites` table
      */
     abstract fun siteDao(): SiteDao
+
+    /**
+     * Returns the DAO of the `incidents` table
+     */
+    abstract fun incidentDao(): IncidentDao
 }

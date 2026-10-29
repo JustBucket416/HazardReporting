@@ -20,10 +20,13 @@ data object Login : Destination
 /**
  * The list of the technician's incidents
  *
+ * @property refreshOnOpen whether the list pulls the technician's incidents as soon as it opens, which signing in
+ * asks for; otherwise it shows what is stored, and pulls only on pull-to-refresh (ADR-0002)
+ *
  * @author Roman Pliskin on 29.10.2026
  */
 @Serializable
-data object IncidentList : Destination
+data class IncidentList(val refreshOnOpen: Boolean = false) : Destination
 
 /**
  * One incident's details

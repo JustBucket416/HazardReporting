@@ -118,6 +118,24 @@ private class ShimmerNode(var highlightColor: Color) : Modifier.Node(), DrawModi
     }
 }
 
+/**
+ * A shimmering placeholder shape that stands in for content while it loads
+ *
+ * @param modifier modifier that sizes the placeholder
+ * @param shape shape of the placeholder
+ *
+ * @author Roman Pliskin on 29.10.2026
+ */
+@Composable
+fun ShimmerPlaceholder(modifier: Modifier = Modifier, shape: Shape = MaterialTheme.shapes.small) {
+    Box(
+        modifier = modifier
+            .clip(shape)
+            .background(ShimmerDefaults.placeholderColor)
+            .shimmer(ShimmerDefaults.highlightColor)
+    )
+}
+
 @Preview(name = "Light", showBackground = true)
 @Preview(name = "Dark", showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
 @Composable
@@ -125,22 +143,12 @@ private fun ShimmerPreview() {
     HazardReportingTheme {
         Surface {
             Row(modifier = Modifier.padding(16.dp), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                PlaceholderShape(Modifier.size(40.dp), CircleShape)
+                ShimmerPlaceholder(Modifier.size(40.dp), CircleShape)
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    PlaceholderShape(Modifier.fillMaxWidth().height(16.dp), MaterialTheme.shapes.small)
-                    PlaceholderShape(Modifier.fillMaxWidth(0.6f).height(12.dp), MaterialTheme.shapes.small)
+                    ShimmerPlaceholder(Modifier.fillMaxWidth().height(16.dp))
+                    ShimmerPlaceholder(Modifier.fillMaxWidth(0.6f).height(12.dp))
                 }
             }
         }
     }
-}
-
-@Composable
-private fun PlaceholderShape(modifier: Modifier, shape: Shape) {
-    Box(
-        modifier = modifier
-            .clip(shape)
-            .background(ShimmerDefaults.placeholderColor)
-            .shimmer(ShimmerDefaults.highlightColor)
-    )
 }

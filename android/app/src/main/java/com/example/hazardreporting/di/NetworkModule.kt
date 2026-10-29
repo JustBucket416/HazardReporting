@@ -2,6 +2,7 @@ package com.example.hazardreporting.di
 
 import com.example.hazardreporting.BuildConfig
 import com.example.hazardreporting.data.catalog.CatalogApi
+import com.example.hazardreporting.data.incident.IncidentApi
 import com.example.hazardreporting.data.remote.BaseUrl
 import com.example.hazardreporting.data.session.AuthInterceptor
 import com.example.hazardreporting.data.session.SessionApi
@@ -94,4 +95,11 @@ object NetworkModule {
     @Provides
     @Singleton
     fun provideCatalogApi(retrofit: Retrofit): CatalogApi = retrofit.create()
+
+    /**
+     * Provides the Retrofit interface for the technician incident routes
+     */
+    @Provides
+    @Singleton
+    fun provideIncidentApi(retrofit: Retrofit): IncidentApi = retrofit.create()
 }

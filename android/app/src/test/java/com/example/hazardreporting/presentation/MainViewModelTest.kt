@@ -54,7 +54,7 @@ class MainViewModelTest {
 
         coVerifySequence { loginInteractor.currentUser() }
 
-        Truth.assertThat(viewModel.uiState.value.startDestination).isEqualTo(IncidentList)
+        Truth.assertThat(viewModel.uiState.value.startDestination).isEqualTo(IncidentList())
     }
 
     @Test
