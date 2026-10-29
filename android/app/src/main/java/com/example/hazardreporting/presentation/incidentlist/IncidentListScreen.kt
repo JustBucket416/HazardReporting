@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
@@ -30,6 +31,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
@@ -113,7 +115,7 @@ fun IncidentListRoute(
 /**
  * The technician's incidents, newest first, with pull-to-refresh and a "Report incident" button that
  * collapses to its icon while the list scrolls. Shows skeleton rows during the first load, an empty state,
- * or an error card with Retry when nothing is stored
+ * or an error card with Retry when nothing is stored, and a persistent banner while the session is invalid
  *
  * @param uiState state of the screen
  * @param snackbarHostState shows the screen's snackbars
@@ -151,28 +153,67 @@ fun IncidentListScreen(
         },
         snackbarHost = { SnackbarHost(snackbarHostState) },
     ) { innerPadding ->
-        PullToRefreshBox(
-            isRefreshing = uiState.isRefreshing,
-            onRefresh = onRefresh,
+        Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding),
         ) {
-            when (val content = uiState.content) {
-                IncidentListContent.Loading -> SkeletonRows()
-                IncidentListContent.Empty -> EmptyState()
-                IncidentListContent.Error -> ErrorCard(onRetry)
-                is IncidentListContent.Incidents -> LazyColumn(
-                    state = listState,
-                    modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(bottom = FAB_CLEARANCE),
-                ) {
-                    items(content.items, key = { it.localId }) { item ->
-                        IncidentRow(item, onClick = { onIncidentClick(item.localId) })
-                        HorizontalDivider()
-                    }
+            if (uiState.isSessionInvalid) SessionInvalidBanner()
+            IncidentListBody(uiState, listState, onRefresh, onRetry, onIncidentClick)
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun IncidentListBody(
+    uiState: IncidentListUiState,
+    listState: LazyListState,
+    onRefresh: () -> Unit,
+    onRetry: () -> Unit,
+    onIncidentClick: (Long) -> Unit,
+) {
+    PullToRefreshBox(
+        isRefreshing = uiState.isRefreshing,
+        onRefresh = onRefresh,
+        modifier = Modifier.fillMaxSize(),
+    ) {
+        when (val content = uiState.content) {
+            IncidentListContent.Loading -> SkeletonRows()
+            IncidentListContent.Empty -> EmptyState()
+            IncidentListContent.Error -> ErrorCard(onRetry)
+            is IncidentListContent.Incidents -> LazyColumn(
+                state = listState,
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(bottom = FAB_CLEARANCE),
+            ) {
+                items(content.items, key = { it.localId }) { item ->
+                    IncidentRow(item, onClick = { onIncidentClick(item.localId) })
+                    HorizontalDivider()
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun SessionInvalidBanner() {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = MaterialTheme.colorScheme.errorContainer,
+        contentColor = MaterialTheme.colorScheme.onErrorContainer,
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            // Decorative: the text says it all
+            Icon(painterResource(R.drawable.ic_warning), contentDescription = null)
+            Text(
+                text = stringResource(R.string.incident_list_session_invalid),
+                style = MaterialTheme.typography.bodyMedium,
+            )
         }
     }
 }
@@ -364,6 +405,14 @@ private fun IncidentListScreenPreview() {
                 )
             )
         )
+    )
+}
+
+@Preview(name = "Session invalid")
+@Composable
+private fun IncidentListScreenSessionInvalidPreview() {
+    IncidentListScreenPreviewContent(
+        IncidentListUiState(content = IncidentListContent.Empty, isSessionInvalid = true)
     )
 }
 

@@ -8,12 +8,14 @@ import com.example.hazardreporting.domain.model.Severity
  *
  * @property content what the list area shows
  * @property isRefreshing whether a pull-to-refresh is in flight
+ * @property isSessionInvalid whether the server rejected the session, which a persistent banner explains
  *
  * @author Roman Pliskin on 29.10.2026
  */
 data class IncidentListUiState(
     val content: IncidentListContent = IncidentListContent.Loading,
     val isRefreshing: Boolean = false,
+    val isSessionInvalid: Boolean = false,
 )
 
 /**

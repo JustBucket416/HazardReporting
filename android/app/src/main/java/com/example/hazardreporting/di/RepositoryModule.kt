@@ -4,11 +4,13 @@ import com.example.hazardreporting.data.catalog.CatalogRepositoryImpl
 import com.example.hazardreporting.data.incident.IncidentRepositoryImpl
 import com.example.hazardreporting.data.location.FusedLocationProvider
 import com.example.hazardreporting.data.session.SessionRepositoryImpl
+import com.example.hazardreporting.data.sync.SyncRepositoryImpl
 import com.example.hazardreporting.data.sync.SyncSchedulerImpl
 import com.example.hazardreporting.domain.repository.CatalogRepository
 import com.example.hazardreporting.domain.repository.IncidentRepository
 import com.example.hazardreporting.domain.repository.LocationProvider
 import com.example.hazardreporting.domain.repository.SessionRepository
+import com.example.hazardreporting.domain.repository.SyncRepository
 import com.example.hazardreporting.domain.repository.SyncScheduler
 import dagger.Binds
 import dagger.Module
@@ -50,4 +52,10 @@ interface RepositoryModule {
      */
     @Binds
     fun bindSyncScheduler(scheduler: SyncSchedulerImpl): SyncScheduler
+
+    /**
+     * Binds [SyncRepositoryImpl] as the [SyncRepository]
+     */
+    @Binds
+    fun bindSyncRepository(repository: SyncRepositoryImpl): SyncRepository
 }

@@ -1,5 +1,6 @@
 package com.example.hazardreporting.domain.interactor
 
+import com.example.hazardreporting.domain.exception.UnauthorizedException
 import com.example.hazardreporting.domain.exception.ValidationException
 import com.example.hazardreporting.domain.model.Incident
 import com.example.hazardreporting.domain.model.IncidentDraft
@@ -11,6 +12,8 @@ import com.example.hazardreporting.domain.model.SyncState
 import com.example.hazardreporting.domain.repository.CatalogRepository
 import com.example.hazardreporting.domain.repository.IncidentRepository
 import com.example.hazardreporting.domain.repository.LocationProvider
+import com.example.hazardreporting.domain.repository.SessionRepository
+import com.example.hazardreporting.domain.repository.SyncRepository
 import com.example.hazardreporting.domain.repository.SyncScheduler
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -20,6 +23,8 @@ import kotlinx.coroutines.flow.map
  *
  * @property incidentRepository stores the incidents
  * @property catalogRepository stores the catalog the incidents refer to
+ * @property syncRepository pushes pending changes to the server
+ * @property sessionRepository told when the server rejects the session
  * @property locationProvider provides the device's position for a new report
  * @property syncScheduler schedules pushing saved changes to the server
  *
@@ -28,6 +33,8 @@ import kotlinx.coroutines.flow.map
 class IncidentInteractor(
     private val incidentRepository: IncidentRepository,
     private val catalogRepository: CatalogRepository,
+    private val syncRepository: SyncRepository,
+    private val sessionRepository: SessionRepository,
     private val locationProvider: LocationProvider,
     private val syncScheduler: SyncScheduler,
 ) {
@@ -44,15 +51,18 @@ class IncidentInteractor(
         }
 
     /**
-     * Pulls the catalog and then the technician's incident summaries from the server.
-     * Pushing pending changes first is added with the synchroniser (issue 13)
+     * Pushes the pending changes, then pulls the catalog and the technician's incident summaries from the server.
+     * A rejected session is marked as invalid, so the list can say why nothing syncs; it stays signed in (ADR-0007)
      *
      * @throws com.example.hazardreporting.domain.exception.NoConnectionException if the server can't be reached
-     * @throws com.example.hazardreporting.domain.exception.UnauthorizedException if the server rejects the session
+     * @throws UnauthorizedException if the server rejects the session
      */
     suspend fun refreshIncidents() {
-        catalogRepository.refresh()
-        incidentRepository.pullSummaries()
+        markingRejectedSession {
+            syncRepository.push()
+            catalogRepository.refresh()
+            incidentRepository.pullSummaries()
+        }
     }
 
     /**
@@ -64,11 +74,13 @@ class IncidentInteractor(
      * Downloads the details of the incident with [localId] if [force] is set or they were never downloaded.
      * Downloaded details are reused until the technician refreshes them (ADR-0006)
      *
+     * A rejected session is marked as invalid, like on a refresh
+     *
      * @throws com.example.hazardreporting.domain.exception.NoConnectionException if the server can't be reached
-     * @throws com.example.hazardreporting.domain.exception.UnauthorizedException if the server rejects the session
+     * @throws UnauthorizedException if the server rejects the session
      */
     suspend fun loadIncidentDetails(localId: Long, force: Boolean) {
-        incidentRepository.loadDetails(localId, force)
+        markingRejectedSession { incidentRepository.loadDetails(localId, force) }
     }
 
     /**
@@ -134,5 +146,14 @@ class IncidentInteractor(
      */
     suspend fun discardPhoto(photo: Photo.Local) {
         incidentRepository.deletePhoto(photo)
+    }
+
+    private suspend fun markingRejectedSession(block: suspend () -> Unit) {
+        try {
+            block()
+        } catch (e: UnauthorizedException) {
+            sessionRepository.markSessionInvalid()
+            throw e
+        }
     }
 }

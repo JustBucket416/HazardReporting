@@ -2,8 +2,10 @@ package com.example.hazardreporting.di
 
 import android.content.Context
 import androidx.lifecycle.ViewModelProvider
+import androidx.work.WorkerFactory
 import coil3.ImageLoader
 import com.example.hazardreporting.data.session.SessionHolder
+import com.example.hazardreporting.domain.repository.SyncScheduler
 import dagger.BindsInstance
 import dagger.Component
 import javax.inject.Singleton
@@ -26,6 +28,7 @@ import kotlinx.coroutines.CoroutineScope
         NetworkModule::class,
         RepositoryModule::class,
         ViewModelFactoryModule::class,
+        WorkModule::class,
     ]
 )
 interface AppComponent {
@@ -50,6 +53,16 @@ interface AppComponent {
      * Returns the factory that creates every ViewModel
      */
     fun viewModelFactory(): ViewModelProvider.Factory
+
+    /**
+     * Returns the factory that creates every WorkManager worker
+     */
+    fun workerFactory(): WorkerFactory
+
+    /**
+     * Returns the scheduler of background pushes, so the application can keep the periodic push scheduled
+     */
+    fun syncScheduler(): SyncScheduler
 
     /**
      * Creates [AppComponent]

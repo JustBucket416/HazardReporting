@@ -6,11 +6,17 @@ import com.example.hazardreporting.domain.model.Session
 import com.example.hazardreporting.domain.model.User
 import com.example.hazardreporting.domain.model.UserRole
 import com.example.hazardreporting.domain.repository.SessionRepository
+import com.example.hazardreporting.domain.repository.SyncScheduler
 import com.google.common.truth.Truth
+import io.mockk.Called
 import io.mockk.coEvery
 import io.mockk.coJustRun
 import io.mockk.coVerifySequence
+import io.mockk.every
+import io.mockk.justRun
 import io.mockk.mockk
+import io.mockk.verify
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert
 import org.junit.Test
@@ -21,19 +27,23 @@ import org.junit.Test
 class LoginInteractorTest {
 
     private val sessionRepository = mockk<SessionRepository>()
+    private val syncScheduler = mockk<SyncScheduler>()
 
-    private val interactor = LoginInteractor(sessionRepository)
+    private val interactor = LoginInteractor(sessionRepository, syncScheduler)
 
     @Test
     fun testLogin_Technician() = runTest {
         coEvery { sessionRepository.openSession(EMAIL, PASSWORD) } returns TECHNICIAN_SESSION
         coJustRun { sessionRepository.saveSession(TECHNICIAN_SESSION) }
+        justRun { syncScheduler.schedulePeriodicPush() }
 
         val user = interactor.login(EMAIL, PASSWORD)
 
+        // The technician's pending changes are pushed every 15 minutes from now on
         coVerifySequence {
             sessionRepository.openSession(EMAIL, PASSWORD)
             sessionRepository.saveSession(TECHNICIAN_SESSION)
+            syncScheduler.schedulePeriodicPush()
         }
 
         Truth.assertThat(user).isEqualTo(TECHNICIAN_SESSION.user)
@@ -43,12 +53,14 @@ class LoginInteractorTest {
     fun testLogin_TrimsEmail() = runTest {
         coEvery { sessionRepository.openSession(EMAIL, PASSWORD) } returns TECHNICIAN_SESSION
         coJustRun { sessionRepository.saveSession(TECHNICIAN_SESSION) }
+        justRun { syncScheduler.schedulePeriodicPush() }
 
         interactor.login("  $EMAIL ", PASSWORD)
 
         coVerifySequence {
             sessionRepository.openSession(EMAIL, PASSWORD)
             sessionRepository.saveSession(TECHNICIAN_SESSION)
+            syncScheduler.schedulePeriodicPush()
         }
     }
 
@@ -68,6 +80,7 @@ class LoginInteractorTest {
             sessionRepository.openSession(EMAIL, PASSWORD)
             sessionRepository.closeSession(session)
         }
+        verify { syncScheduler wasNot Called }
     }
 
     @Test
@@ -118,6 +131,15 @@ class LoginInteractorTest {
         coVerifySequence { sessionRepository.currentUser() }
 
         Truth.assertThat(user).isNull()
+    }
+
+    @Test
+    fun testObserveSessionInvalid() {
+        val isInvalid = flowOf(true)
+
+        every { sessionRepository.observeSessionInvalid() } returns isInvalid
+
+        Truth.assertThat(interactor.observeSessionInvalid()).isSameInstanceAs(isInvalid)
     }
 
     private fun sessionOf(role: UserRole) = Session("token", User("u1", EMAIL, "Someone", role))

@@ -7,6 +7,7 @@ import com.example.hazardreporting.domain.exception.NoConnectionException
 import com.example.hazardreporting.domain.exception.UnauthorizedException
 import com.example.hazardreporting.domain.interactor.CatalogInteractor
 import com.example.hazardreporting.domain.interactor.IncidentInteractor
+import com.example.hazardreporting.domain.interactor.LoginInteractor
 import com.example.hazardreporting.domain.model.Category
 import com.example.hazardreporting.domain.model.IncidentStatus
 import com.example.hazardreporting.domain.model.IncidentSummary
@@ -53,9 +54,11 @@ class IncidentListViewModelTest {
 
     private val incidentInteractor = mockk<IncidentInteractor>()
     private val catalogInteractor = mockk<CatalogInteractor>()
+    private val loginInteractor = mockk<LoginInteractor>()
     private val dispatchers = mockk<CoroutineDispatchers>()
     private val logger = mockk<Logger>()
     private val incidents = MutableStateFlow<List<IncidentSummary>>(emptyList())
+    private val isSessionInvalid = MutableStateFlow(false)
 
     @Before
     fun setUp() {
@@ -65,6 +68,7 @@ class IncidentListViewModelTest {
         every { catalogInteractor.observeCategories() } returns flowOf(listOf(CATEGORY))
         every { catalogInteractor.observeSeverities() } returns flowOf(listOf(SEVERITY))
         every { catalogInteractor.observeSites() } returns flowOf(listOf(SITE))
+        every { loginInteractor.observeSessionInvalid() } returns isSessionInvalid
     }
 
     @After
@@ -105,6 +109,25 @@ class IncidentListViewModelTest {
             IncidentListContent.Incidents(
                 listOf(ITEM.copy(categoryName = null, siteName = null, severity = null, hasStatusChangeNotice = true))
             )
+        )
+    }
+
+    @Test
+    fun testUiState_SessionInvalid() = runTest {
+        incidents.value = listOf(SUMMARY)
+
+        val viewModel = createViewModel(refreshOnOpen = false)
+        collectUiState(viewModel)
+        advanceUntilIdle()
+
+        Truth.assertThat(viewModel.uiState.value.isSessionInvalid).isFalse()
+
+        isSessionInvalid.value = true
+        advanceUntilIdle()
+
+        // The banner shows over the stored incidents, which stay
+        Truth.assertThat(viewModel.uiState.value).isEqualTo(
+            IncidentListUiState(IncidentListContent.Incidents(listOf(ITEM)), isSessionInvalid = true)
         )
     }
 
@@ -337,7 +360,14 @@ class IncidentListViewModelTest {
         savedStateHandle: SavedStateHandle = SavedStateHandle(),
     ): IncidentListViewModel {
         every { savedStateHandle.toRoute(IncidentList::class, any()) } returns IncidentList(refreshOnOpen)
-        return IncidentListViewModel(savedStateHandle, incidentInteractor, catalogInteractor, dispatchers, logger)
+        return IncidentListViewModel(
+            savedStateHandle,
+            incidentInteractor,
+            catalogInteractor,
+            loginInteractor,
+            dispatchers,
+            logger,
+        )
     }
 
     /**

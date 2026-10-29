@@ -6,6 +6,7 @@ import com.example.hazardreporting.data.incident.dto.IncidentSummaryDto
 import com.example.hazardreporting.data.incident.entity.IncidentEntity
 import com.example.hazardreporting.data.incident.entity.IncidentPhotoEntity
 import com.example.hazardreporting.data.incident.entity.IncidentWithPhotos
+import com.example.hazardreporting.data.sync.SyncLock
 import com.example.hazardreporting.domain.exception.NoConnectionException
 import com.example.hazardreporting.domain.model.Incident
 import com.example.hazardreporting.domain.model.IncidentDraft
@@ -16,6 +17,7 @@ import com.example.hazardreporting.utils.CoroutineDispatchers
 import com.google.common.truth.Truth
 import io.mockk.coEvery
 import io.mockk.coJustRun
+import io.mockk.coVerify
 import io.mockk.coVerifySequence
 import io.mockk.every
 import io.mockk.justRun
@@ -24,8 +26,10 @@ import io.mockk.verifySequence
 import java.time.Clock
 import java.time.Instant
 import java.time.ZoneOffset
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert
@@ -43,6 +47,7 @@ class IncidentRepositoryImplTest {
     private val photoLocalDataSource = mockk<PhotoLocalDataSource>()
     private val converter = mockk<IncidentConverter>()
     private val clock = Clock.fixed(Instant.ofEpochMilli(NOW), ZoneOffset.UTC)
+    private val syncLock = SyncLock()
     private val dispatchers = mockk<CoroutineDispatchers>()
 
     private lateinit var repository: IncidentRepositoryImpl
@@ -60,6 +65,7 @@ class IncidentRepositoryImplTest {
             photoLocalDataSource,
             converter,
             clock,
+            syncLock,
             dispatchers,
         )
     }
@@ -222,6 +228,27 @@ class IncidentRepositoryImplTest {
     }
 
     @Test
+    fun testPullSummaries_WaitsForSyncLock() = runTest {
+        val push = CompletableDeferred<Unit>()
+
+        coEvery { remoteDataSource.fetchSummaries() } returns emptyList()
+        coEvery { localDataSource.getIncidents() } returns emptyList()
+        stubWrites()
+
+        val pushing = launch(UnconfinedTestDispatcher(testScheduler)) { syncLock.withLock { push.await() } }
+        val pulling = launch(UnconfinedTestDispatcher(testScheduler)) { repository.pullSummaries() }
+
+        // Summaries downloaded during a push could be merged into rows the push is writing
+        coVerify(exactly = 0) { remoteDataSource.fetchSummaries() }
+
+        push.complete(Unit)
+        pushing.join()
+        pulling.join()
+
+        coVerify(exactly = 1) { remoteDataSource.fetchSummaries() }
+    }
+
+    @Test
     fun testPullSummaries_NoConnection() {
         coEvery { remoteDataSource.fetchSummaries() } throws NoConnectionException()
 
@@ -347,6 +374,7 @@ class IncidentRepositoryImplTest {
         val photoEntities = listOf(mockk<IncidentPhotoEntity>())
 
         coEvery { localDataSource.inTransaction<Long>(any()) } coAnswers { firstArg<suspend () -> Long>().invoke() }
+        coEvery { localDataSource.existsCreatedAt(NOW) } returns false
         every { draft.photos } returns photos
         every { converter.convertNew(draft, NOW) } returns entity
         coEvery { localDataSource.insertIncident(entity) } returns 9L
@@ -358,6 +386,7 @@ class IncidentRepositoryImplTest {
         // createdAt is the device's clock at first save; the row and its photos land in one transaction
         coVerifySequence {
             localDataSource.inTransaction<Long>(any())
+            localDataSource.existsCreatedAt(NOW)
             converter.convertNew(draft, NOW)
             localDataSource.insertIncident(entity)
             converter.convertPhotos(9L, photos)
@@ -365,6 +394,36 @@ class IncidentRepositoryImplTest {
         }
 
         Truth.assertThat(localId).isEqualTo(9L)
+    }
+
+    @Test
+    fun testReport_CreatedAtTaken() = runTest {
+        val draft = mockk<IncidentDraft>()
+        val entity = mockk<IncidentEntity>()
+
+        coEvery { localDataSource.inTransaction<Long>(any()) } coAnswers { firstArg<suspend () -> Long>().invoke() }
+        coEvery { localDataSource.existsCreatedAt(NOW) } returns true
+        coEvery { localDataSource.existsCreatedAt(NOW + 1) } returns true
+        coEvery { localDataSource.existsCreatedAt(NOW + 2) } returns false
+        every { draft.photos } returns emptyList()
+        every { converter.convertNew(draft, NOW + 2) } returns entity
+        coEvery { localDataSource.insertIncident(entity) } returns 9L
+        every { converter.convertPhotos(9L, emptyList()) } returns emptyList()
+        coJustRun { localDataSource.insertPhotos(emptyList()) }
+
+        repository.report(draft)
+
+        // Two reports on the device never share a createdAt, so they can never become one server incident
+        coVerifySequence {
+            localDataSource.inTransaction<Long>(any())
+            localDataSource.existsCreatedAt(NOW)
+            localDataSource.existsCreatedAt(NOW + 1)
+            localDataSource.existsCreatedAt(NOW + 2)
+            converter.convertNew(draft, NOW + 2)
+            localDataSource.insertIncident(entity)
+            converter.convertPhotos(9L, emptyList())
+            localDataSource.insertPhotos(emptyList())
+        }
     }
 
     @Test

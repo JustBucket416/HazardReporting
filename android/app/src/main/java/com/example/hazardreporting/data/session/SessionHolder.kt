@@ -5,13 +5,16 @@ import com.example.hazardreporting.utils.CoroutineDispatchers
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 
 /**
  * Keeps the [Session] in memory, so the synchronous [AuthInterceptor] can read the token (ADR-0010).
  * [load] runs at startup; until it finishes, [sessionBlocking] falls back to a blocking DataStore read.
- * [save] updates DataStore and memory together
+ * [save] updates DataStore and memory together. It also remembers, for as long as the process lives, whether
+ * the server rejected the session ([isRejected]); the app never signs out on its own because of that (ADR-0007)
  *
  * @property localDataSource stores the session
  * @property dispatchers used for reading and writing the stored session on the IO dispatcher
@@ -25,6 +28,13 @@ class SessionHolder @Inject constructor(
 ) {
 
     private val state = MutableStateFlow<SessionState>(SessionState.Loading)
+    private val _isRejected = MutableStateFlow(false)
+
+    /**
+     * Whether the server answered a request with 401 since the session was saved, e.g. after it was reset.
+     * Sync stops until the technician signs out and in again
+     */
+    val isRejected: StateFlow<Boolean> = _isRejected.asStateFlow()
 
     /**
      * Reads the stored session into memory, unless it's already there
@@ -52,11 +62,19 @@ class SessionHolder @Inject constructor(
     }
 
     /**
-     * Stores [session] in DataStore and then in memory
+     * Stores [session] in DataStore and then in memory. A new session isn't rejected
      */
     suspend fun save(session: Session) {
         withContext(dispatchers.io) { localDataSource.write(session) }
         state.value = SessionState.Loaded(session)
+        _isRejected.value = false
+    }
+
+    /**
+     * Records that the server rejected the session
+     */
+    fun markRejected() {
+        _isRejected.value = true
     }
 
     private suspend fun readStoredSession(): Session? {

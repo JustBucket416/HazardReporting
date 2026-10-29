@@ -1,6 +1,7 @@
 package com.example.hazardreporting.data.incident
 
 import com.example.hazardreporting.data.incident.entity.IncidentEntity
+import com.example.hazardreporting.data.sync.SyncLock
 import com.example.hazardreporting.domain.model.Incident
 import com.example.hazardreporting.domain.model.IncidentDraft
 import com.example.hazardreporting.domain.model.IncidentSummary
@@ -24,6 +25,7 @@ import kotlinx.coroutines.withContext
  * @property photoLocalDataSource used for storing photo files
  * @property converter used for converting between DTOs, entities and domain models
  * @property clock used for stamping a new report's createdAt
+ * @property syncLock keeps pulls and pushes apart
  * @property dispatchers used for running on the IO dispatcher
  *
  * @author Roman Pliskin on 29.10.2026
@@ -34,6 +36,7 @@ class IncidentRepositoryImpl @Inject constructor(
     private val photoLocalDataSource: PhotoLocalDataSource,
     private val converter: IncidentConverter,
     private val clock: Clock,
+    private val syncLock: SyncLock,
     private val dispatchers: CoroutineDispatchers,
 ) : IncidentRepository {
 
@@ -43,35 +46,8 @@ class IncidentRepositoryImpl @Inject constructor(
 
     override suspend fun pullSummaries() {
         withContext(dispatchers.io) {
-            val summaries = remoteDataSource.fetchSummaries()
-            localDataSource.inTransaction {
-                val stored = localDataSource.getIncidents()
-                val storedByServerId = stored.filter { it.serverId != null }.associateBy { it.serverId }
-                // A report whose POST reached the server but whose response was lost has no server id yet.
-                // The server knows it by reporter and createdAt (ADR-0003), and every stored row is the reporter's
-                val unidentifiedByCreatedAt = stored.filter { it.serverId == null }.associateBy { it.createdAt }
-
-                val inserted = mutableListOf<IncidentEntity>()
-                val updated = mutableListOf<IncidentEntity>()
-                for (summary in summaries) {
-                    val row = storedByServerId[summary.id] ?: unidentifiedByCreatedAt[summary.createdAt]
-                    when {
-                        row == null -> inserted += converter.convert(summary)
-                        row.syncState == SyncState.Synced -> updated += converter.withSummary(row, summary)
-                        // A pending change keeps its report fields until the server accepts it
-                        else -> updated += converter.withStatus(row, summary)
-                    }
-                }
-                // The server no longer lists a synced incident it once sent, e.g. one withdrawn elsewhere
-                val pulledIds = summaries.map { it.id }.toSet()
-                val gone = stored.filter {
-                    it.syncState == SyncState.Synced && it.serverId != null && it.serverId !in pulledIds
-                }
-
-                localDataSource.insertIncidents(inserted)
-                localDataSource.updateIncidents(updated)
-                localDataSource.deleteIncidents(gone.map { it.localId })
-            }
+            // Never during a push: summaries downloaded before a POST must not be merged into rows written after it
+            syncLock.withLock { pullSummariesLocked() }
         }
     }
 
@@ -103,9 +79,11 @@ class IncidentRepositoryImpl @Inject constructor(
     }
 
     override suspend fun report(draft: IncidentDraft): Long = withContext(dispatchers.io) {
-        // The device's clock at first save; it never changes and is how the server deduplicates (ADR-0003)
-        val createdAt = clock.millis()
         localDataSource.inTransaction {
+            // The device's clock at first save; it never changes and is how the server deduplicates (ADR-0003).
+            // Two reports on the device never share it, so no two rows can ever stand for one server incident
+            var createdAt = clock.millis()
+            while (localDataSource.existsCreatedAt(createdAt)) createdAt++
             val localId = localDataSource.insertIncident(converter.convertNew(draft, createdAt))
             localDataSource.insertPhotos(converter.convertPhotos(localId, draft.photos))
             localId
@@ -122,5 +100,37 @@ class IncidentRepositoryImpl @Inject constructor(
 
     override suspend fun deletePhoto(photo: Photo.Local) {
         withContext(dispatchers.io) { photoLocalDataSource.deletePhoto(photo.path) }
+    }
+
+    private suspend fun pullSummariesLocked() {
+        val summaries = remoteDataSource.fetchSummaries()
+        localDataSource.inTransaction {
+            val stored = localDataSource.getIncidents()
+            val storedByServerId = stored.filter { it.serverId != null }.associateBy { it.serverId }
+            // A report whose POST reached the server but whose response was lost has no server id yet.
+            // The server knows it by reporter and createdAt (ADR-0003), and every stored row is the reporter's
+            val unidentifiedByCreatedAt = stored.filter { it.serverId == null }.associateBy { it.createdAt }
+
+            val inserted = mutableListOf<IncidentEntity>()
+            val updated = mutableListOf<IncidentEntity>()
+            for (summary in summaries) {
+                val row = storedByServerId[summary.id] ?: unidentifiedByCreatedAt[summary.createdAt]
+                when {
+                    row == null -> inserted += converter.convert(summary)
+                    row.syncState == SyncState.Synced -> updated += converter.withSummary(row, summary)
+                    // A pending change keeps its report fields until the server accepts it
+                    else -> updated += converter.withStatus(row, summary)
+                }
+            }
+            // The server no longer lists a synced incident it once sent, e.g. one withdrawn elsewhere
+            val pulledIds = summaries.map { it.id }.toSet()
+            val gone = stored.filter {
+                it.syncState == SyncState.Synced && it.serverId != null && it.serverId !in pulledIds
+            }
+
+            localDataSource.insertIncidents(inserted)
+            localDataSource.updateIncidents(updated)
+            localDataSource.deleteIncidents(gone.map { it.localId })
+        }
     }
 }

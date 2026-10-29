@@ -7,6 +7,7 @@ import androidx.room.Transaction
 import androidx.room.Update
 import com.example.hazardreporting.data.incident.entity.IncidentEntity
 import com.example.hazardreporting.data.incident.entity.IncidentWithPhotos
+import com.example.hazardreporting.domain.model.SyncState
 import kotlinx.coroutines.flow.Flow
 
 /**
@@ -41,6 +42,37 @@ interface IncidentDao {
      */
     @Query("SELECT * FROM incidents WHERE localId = :localId")
     suspend fun getByLocalId(localId: Long): IncidentEntity?
+
+    /**
+     * Returns the incident with [localId] together with its photos, or null if there is none
+     */
+    @Transaction
+    @Query("SELECT * FROM incidents WHERE localId = :localId")
+    suspend fun getWithPhotos(localId: Long): IncidentWithPhotos?
+
+    /**
+     * Returns the incident the server knows as [serverId], or null if there is none
+     */
+    @Query("SELECT * FROM incidents WHERE serverId = :serverId")
+    suspend fun getByServerId(serverId: String): IncidentEntity?
+
+    /**
+     * Returns the incidents whose sync state isn't [syncState], oldest first
+     */
+    @Query("SELECT * FROM incidents WHERE syncState != :syncState ORDER BY localId")
+    suspend fun getAllExcept(syncState: SyncState): List<IncidentEntity>
+
+    /**
+     * Returns whether an incident was created at exactly [createdAt]
+     */
+    @Query("SELECT EXISTS(SELECT 1 FROM incidents WHERE createdAt = :createdAt)")
+    suspend fun existsCreatedAt(createdAt: Long): Boolean
+
+    /**
+     * Records that a POST of the incident with [localId] is about to be sent
+     */
+    @Query("UPDATE incidents SET createAttempted = 1 WHERE localId = :localId")
+    suspend fun markCreateAttempted(localId: Long)
 
     /**
      * Inserts [incident] and returns its generated local id

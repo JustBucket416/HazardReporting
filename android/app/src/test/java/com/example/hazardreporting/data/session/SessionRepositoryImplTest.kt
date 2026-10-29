@@ -14,9 +14,11 @@ import io.mockk.coEvery
 import io.mockk.coJustRun
 import io.mockk.coVerifySequence
 import io.mockk.every
+import io.mockk.justRun
 import io.mockk.mockk
 import io.mockk.verify
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
 import okhttp3.ResponseBody.Companion.toResponseBody
@@ -157,6 +159,24 @@ class SessionRepositoryImplTest {
         coVerifySequence { sessionHolder.session() }
 
         Truth.assertThat(user).isNull()
+    }
+
+    @Test
+    fun testObserveSessionInvalid() {
+        val isRejected = MutableStateFlow(true)
+
+        every { sessionHolder.isRejected } returns isRejected
+
+        Truth.assertThat(repository.observeSessionInvalid()).isSameInstanceAs(isRejected)
+    }
+
+    @Test
+    fun testMarkSessionInvalid() {
+        justRun { sessionHolder.markRejected() }
+
+        repository.markSessionInvalid()
+
+        verify(exactly = 1) { sessionHolder.markRejected() }
     }
 
     private companion object {

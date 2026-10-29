@@ -1,8 +1,10 @@
 package com.example.hazardreporting.data.incident
 
+import com.example.hazardreporting.data.incident.dto.CreateIncidentRequestDto
 import com.example.hazardreporting.data.incident.dto.IncidentDto
 import com.example.hazardreporting.data.incident.dto.IncidentSummaryDto
 import com.example.hazardreporting.data.incident.dto.PositionDto
+import com.example.hazardreporting.data.incident.dto.UpdateIncidentRequestDto
 import com.example.hazardreporting.data.incident.entity.IncidentEntity
 import com.example.hazardreporting.data.incident.entity.IncidentPhotoEntity
 import com.example.hazardreporting.data.incident.entity.IncidentWithPhotos
@@ -270,11 +272,143 @@ class IncidentConverterTest {
     }
 
     @Test
-    fun testConvertPhoto_LocalFileWins() {
-        // Just after an upload a photo has both; the file is used until it is deleted
+    fun testConvertPhoto_UploadedWins() {
+        // An uploaded photo keeps the path of its file, which is deleted after the upload
         val photo = converter.convertPhoto(photoRow(localPath = "/files/photos/a.jpg", remoteUrl = REMOTE_A))
 
+        Truth.assertThat(photo).isEqualTo(Photo.Remote("http://10.0.2.2:3001/uploads/a.jpg"))
+    }
+
+    @Test
+    fun testConvertPhoto_NotUploaded() {
+        val photo = converter.convertPhoto(photoRow(localPath = "/files/photos/a.jpg", remoteUrl = null))
+
         Truth.assertThat(photo).isEqualTo(Photo.Local("/files/photos/a.jpg"))
+    }
+
+    @Test
+    fun testWithAccepted() {
+        val sent = STORED_ENTITY.copy(
+            serverId = null,
+            status = "open",
+            updatedAt = null,
+            priority = null,
+            syncState = SyncState.PendingCreate,
+            localVersion = 2,
+        )
+
+        val entity = converter.withAccepted(sent, INCIDENT_DTO)
+
+        // Synced with the server's id, status, priority and update time; the report fields are what was sent
+        Truth.assertThat(entity).isEqualTo(
+            sent.copy(
+                serverId = "inc-1",
+                status = "acknowledged",
+                updatedAt = CHANGED_UPDATED_AT,
+                priority = "urgent",
+                syncState = SyncState.Synced,
+            )
+        )
+    }
+
+    @Test
+    fun testWithServerState_KeepsPendingChange() {
+        val changed = STORED_ENTITY.copy(serverId = null, syncState = SyncState.PendingCreate, localVersion = 3)
+
+        val entity = converter.withServerState(changed, INCIDENT_DTO)
+
+        Truth.assertThat(entity).isEqualTo(
+            changed.copy(serverId = "inc-1", status = "acknowledged", updatedAt = CHANGED_UPDATED_AT)
+        )
+    }
+
+    @Test
+    fun testWithServerVersion() {
+        val pending = STORED_ENTITY.copy(syncState = SyncState.PendingUpdate, localVersion = 4)
+
+        val entity = converter.withServerVersion(pending, INCIDENT_DTO, hasStatusChangeNotice = true)
+
+        // The pending change is dropped: every field is the server's, and the notice is raised
+        Truth.assertThat(entity).isEqualTo(
+            converter.withDetails(pending, INCIDENT_DTO).copy(
+                syncState = SyncState.Synced,
+                statusChangeNoticePending = true,
+            )
+        )
+        Truth.assertThat(entity.title).isEqualTo("Changed title")
+        Truth.assertThat(entity.localVersion).isEqualTo(4)
+    }
+
+    @Test
+    fun testWithServerVersion_WithoutNotice() {
+        val pending = STORED_ENTITY.copy(syncState = SyncState.PendingWithdraw)
+
+        val entity = converter.withServerVersion(pending, INCIDENT_DTO, hasStatusChangeNotice = false)
+
+        Truth.assertThat(entity.syncState).isEqualTo(SyncState.Synced)
+        Truth.assertThat(entity.statusChangeNoticePending).isFalse()
+    }
+
+    @Test
+    fun testConvertCreateRequest() {
+        val request = converter.convertCreateRequest(STORED_ENTITY, listOf(REMOTE_A, REMOTE_B))
+
+        Truth.assertThat(request).isEqualTo(
+            CreateIncidentRequestDto(
+                title = "Conveyor belt fraying",
+                description = "Fraying near the transfer point",
+                categoryId = "cat-equipment",
+                severityId = "sev-high",
+                siteId = "site-north",
+                locationDescription = "Line 3",
+                position = PositionDto(53.5, -2.2, 10.0),
+                photoUrls = listOf(REMOTE_A, REMOTE_B),
+                createdAt = CREATED_AT,
+            )
+        )
+    }
+
+    @Test
+    fun testConvertCreateRequest_WithoutPositionOrTexts() {
+        val entity = STORED_ENTITY.copy(
+            description = null,
+            locationDescription = null,
+            positionLat = null,
+            positionLng = null,
+            positionAccuracyM = null,
+        )
+
+        val request = converter.convertCreateRequest(entity, listOf(REMOTE_A))
+
+        Truth.assertThat(request.description).isEmpty()
+        Truth.assertThat(request.locationDescription).isEmpty()
+        Truth.assertThat(request.position).isNull()
+    }
+
+    @Test
+    fun testConvertUpdateRequest() {
+        val request = converter.convertUpdateRequest(STORED_ENTITY, listOf(REMOTE_B))
+
+        // Every report field the technician owns, and no createdAt
+        Truth.assertThat(request).isEqualTo(
+            UpdateIncidentRequestDto(
+                title = "Conveyor belt fraying",
+                description = "Fraying near the transfer point",
+                categoryId = "cat-equipment",
+                severityId = "sev-high",
+                siteId = "site-north",
+                locationDescription = "Line 3",
+                position = PositionDto(53.5, -2.2, 10.0),
+                photoUrls = listOf(REMOTE_B),
+            )
+        )
+    }
+
+    @Test
+    fun testConvertUpdateRequest_WithoutPosition() {
+        val entity = STORED_ENTITY.copy(positionLat = null, positionLng = null, positionAccuracyM = null)
+
+        Truth.assertThat(converter.convertUpdateRequest(entity, listOf(REMOTE_A)).position).isNull()
     }
 
     @Test

@@ -24,6 +24,28 @@ interface IncidentPhotoDao {
     }
 
     /**
+     * Returns every photo of the incident with [incidentLocalId], in no particular order
+     */
+    @Query("SELECT * FROM incident_photos WHERE incidentLocalId = :incidentLocalId")
+    suspend fun getForIncident(incidentLocalId: Long): List<IncidentPhotoEntity>
+
+    /**
+     * Returns the local path of every photo that has one
+     */
+    @Query("SELECT localPath FROM incident_photos WHERE localPath IS NOT NULL")
+    suspend fun getLocalPaths(): List<String>
+
+    /**
+     * Stores [remoteUrl] on the photos of the incident with [incidentLocalId] whose file is [localPath]
+     * and that have no server URL yet
+     */
+    @Query(
+        "UPDATE incident_photos SET remoteUrl = :remoteUrl " +
+            "WHERE incidentLocalId = :incidentLocalId AND localPath = :localPath AND remoteUrl IS NULL"
+    )
+    suspend fun setRemoteUrl(incidentLocalId: Long, localPath: String, remoteUrl: String)
+
+    /**
      * Inserts [photos]
      */
     @Insert

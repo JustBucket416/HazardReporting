@@ -7,6 +7,7 @@ import com.example.hazardreporting.domain.model.User
 import com.example.hazardreporting.domain.repository.SessionRepository
 import com.example.hazardreporting.utils.CoroutineDispatchers
 import javax.inject.Inject
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.withContext
 import retrofit2.HttpException
 
@@ -51,5 +52,11 @@ class SessionRepositoryImpl @Inject constructor(
 
     override suspend fun currentUser(): User? = withContext(dispatchers.io) {
         sessionHolder.session()?.user
+    }
+
+    override fun observeSessionInvalid(): Flow<Boolean> = sessionHolder.isRejected
+
+    override fun markSessionInvalid() {
+        sessionHolder.markRejected()
     }
 }

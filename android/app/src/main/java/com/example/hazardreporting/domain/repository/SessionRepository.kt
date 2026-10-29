@@ -2,6 +2,7 @@ package com.example.hazardreporting.domain.repository
 
 import com.example.hazardreporting.domain.model.Session
 import com.example.hazardreporting.domain.model.User
+import kotlinx.coroutines.flow.Flow
 
 /**
  * Opens, keeps and closes the user's session. Opening a session doesn't store it, so the caller can
@@ -34,4 +35,15 @@ interface SessionRepository {
      * Returns the signed-in user, or null if nobody is signed in
      */
     suspend fun currentUser(): User?
+
+    /**
+     * Observes whether the server rejected the signed-in session, e.g. after it was reset. A rejected session
+     * stays signed in (ADR-0007); signing in again replaces it
+     */
+    fun observeSessionInvalid(): Flow<Boolean>
+
+    /**
+     * Records that the server rejected the signed-in session
+     */
+    fun markSessionInvalid()
 }

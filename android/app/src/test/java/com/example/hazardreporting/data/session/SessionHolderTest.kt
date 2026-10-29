@@ -109,6 +109,22 @@ class SessionHolderTest {
     }
 
     @Test
+    fun testIsRejected() = runTest {
+        coJustRun { localDataSource.write(SESSION) }
+
+        Truth.assertThat(holder.isRejected.value).isFalse()
+
+        holder.markRejected()
+
+        // Stays signed in; only a new session clears it
+        Truth.assertThat(holder.isRejected.value).isTrue()
+
+        holder.save(SESSION)
+
+        Truth.assertThat(holder.isRejected.value).isFalse()
+    }
+
+    @Test
     fun testLoad_SessionSavedDuringRead() = runTest {
         val savedSession = SESSION.copy(token = "newer-token")
 

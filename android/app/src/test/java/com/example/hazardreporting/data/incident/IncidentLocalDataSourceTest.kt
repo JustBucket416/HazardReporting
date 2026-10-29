@@ -6,6 +6,7 @@ import com.example.hazardreporting.data.incident.entity.IncidentEntity
 import com.example.hazardreporting.data.incident.entity.IncidentPhotoEntity
 import com.example.hazardreporting.data.incident.entity.IncidentWithPhotos
 import com.example.hazardreporting.data.local.HazardReportingDatabase
+import com.example.hazardreporting.domain.model.SyncState
 import com.google.common.truth.Truth
 import io.mockk.coEvery
 import io.mockk.coJustRun
@@ -145,5 +146,85 @@ class IncidentLocalDataSourceTest {
         dataSource.deleteIncidents(listOf(1L, 2L))
 
         coVerifySequence { incidentDao.deleteAll(listOf(1L, 2L)) }
+    }
+
+    @Test
+    fun testGetIncidentWithPhotos() = runTest {
+        val incident = mockk<IncidentWithPhotos>()
+
+        coEvery { incidentDao.getWithPhotos(1L) } returns incident
+
+        Truth.assertThat(dataSource.getIncidentWithPhotos(1L)).isSameInstanceAs(incident)
+
+        coVerifySequence { incidentDao.getWithPhotos(1L) }
+    }
+
+    @Test
+    fun testGetIncidentByServerId() = runTest {
+        val incident = mockk<IncidentEntity>()
+
+        coEvery { incidentDao.getByServerId("inc-1") } returns incident
+
+        Truth.assertThat(dataSource.getIncidentByServerId("inc-1")).isSameInstanceAs(incident)
+
+        coVerifySequence { incidentDao.getByServerId("inc-1") }
+    }
+
+    @Test
+    fun testGetPendingIncidents() = runTest {
+        val incidents = listOf(mockk<IncidentEntity>())
+
+        coEvery { incidentDao.getAllExcept(SyncState.Synced) } returns incidents
+
+        Truth.assertThat(dataSource.getPendingIncidents()).isEqualTo(incidents)
+
+        coVerifySequence { incidentDao.getAllExcept(SyncState.Synced) }
+    }
+
+    @Test
+    fun testExistsCreatedAt() = runTest {
+        coEvery { incidentDao.existsCreatedAt(100L) } returns true
+
+        Truth.assertThat(dataSource.existsCreatedAt(100L)).isTrue()
+
+        coVerifySequence { incidentDao.existsCreatedAt(100L) }
+    }
+
+    @Test
+    fun testMarkCreateAttempted() = runTest {
+        coJustRun { incidentDao.markCreateAttempted(1L) }
+
+        dataSource.markCreateAttempted(1L)
+
+        coVerifySequence { incidentDao.markCreateAttempted(1L) }
+    }
+
+    @Test
+    fun testGetPhotos() = runTest {
+        val photos = listOf(mockk<IncidentPhotoEntity>())
+
+        coEvery { photoDao.getForIncident(1L) } returns photos
+
+        Truth.assertThat(dataSource.getPhotos(1L)).isEqualTo(photos)
+
+        coVerifySequence { photoDao.getForIncident(1L) }
+    }
+
+    @Test
+    fun testGetPhotoLocalPaths() = runTest {
+        coEvery { photoDao.getLocalPaths() } returns listOf("/files/photos/a.jpg")
+
+        Truth.assertThat(dataSource.getPhotoLocalPaths()).containsExactly("/files/photos/a.jpg")
+
+        coVerifySequence { photoDao.getLocalPaths() }
+    }
+
+    @Test
+    fun testSetPhotoRemoteUrl() = runTest {
+        coJustRun { photoDao.setRemoteUrl(1L, "/files/photos/a.jpg", "/uploads/a.jpg") }
+
+        dataSource.setPhotoRemoteUrl(1L, "/files/photos/a.jpg", "/uploads/a.jpg")
+
+        coVerifySequence { photoDao.setRemoteUrl(1L, "/files/photos/a.jpg", "/uploads/a.jpg") }
     }
 }

@@ -1,7 +1,10 @@
 package com.example.hazardreporting.data.incident
 
+import com.example.hazardreporting.data.incident.dto.CreateIncidentRequestDto
 import com.example.hazardreporting.data.incident.dto.IncidentDto
 import com.example.hazardreporting.data.incident.dto.IncidentSummaryDto
+import com.example.hazardreporting.data.incident.dto.PositionDto
+import com.example.hazardreporting.data.incident.dto.UpdateIncidentRequestDto
 import com.example.hazardreporting.data.incident.entity.IncidentEntity
 import com.example.hazardreporting.data.incident.entity.IncidentPhotoEntity
 import com.example.hazardreporting.data.incident.entity.IncidentWithPhotos
@@ -114,6 +117,74 @@ class IncidentConverter @Inject constructor(
     )
 
     /**
+     * Returns [entity] marked as synced after the server accepted its pending change and answered with [dto]:
+     * it takes the server's id, status, priority and update time. The report fields stay as they are,
+     * since they are what the server accepted
+     */
+    fun withAccepted(entity: IncidentEntity, dto: IncidentDto): IncidentEntity = entity.copy(
+        serverId = dto.id,
+        status = dto.status,
+        updatedAt = dto.updatedAt,
+        priority = dto.priority,
+        syncState = SyncState.Synced,
+    )
+
+    /**
+     * Returns [entity] with the server's id, status and update time taken from [dto], keeping its sync state.
+     * For a row whose pending change the server accepted while it was changed again on the device:
+     * the newer change stays pending
+     */
+    fun withServerState(entity: IncidentEntity, dto: IncidentDto): IncidentEntity = entity.copy(
+        serverId = dto.id,
+        status = dto.status,
+        updatedAt = dto.updatedAt,
+    )
+
+    /**
+     * Returns [entity] overwritten with the server's version of the incident, [dto], with its pending change
+     * dropped (ADR-0004). The photos are converted by [convertPhotos]
+     *
+     * @param hasStatusChangeNotice whether the technician must be told that their change wasn't applied
+     */
+    fun withServerVersion(entity: IncidentEntity, dto: IncidentDto, hasStatusChangeNotice: Boolean): IncidentEntity =
+        withDetails(entity, dto).copy(
+            syncState = SyncState.Synced,
+            statusChangeNoticePending = hasStatusChangeNotice,
+        )
+
+    /**
+     * Converts a stored report to the body of its `POST /incidents`, with [photoUrls] as its uploaded photos
+     */
+    fun convertCreateRequest(entity: IncidentEntity, photoUrls: List<String>): CreateIncidentRequestDto =
+        CreateIncidentRequestDto(
+            title = entity.title,
+            description = entity.description.orEmpty(),
+            categoryId = entity.categoryId,
+            severityId = entity.severityId,
+            siteId = entity.siteId,
+            locationDescription = entity.locationDescription.orEmpty(),
+            position = convertPositionDto(entity),
+            photoUrls = photoUrls,
+            createdAt = entity.createdAt,
+        )
+
+    /**
+     * Converts a stored, edited incident to the body of its `PATCH /incidents/:id`, with [photoUrls] as its
+     * uploaded photos
+     */
+    fun convertUpdateRequest(entity: IncidentEntity, photoUrls: List<String>): UpdateIncidentRequestDto =
+        UpdateIncidentRequestDto(
+            title = entity.title,
+            description = entity.description.orEmpty(),
+            categoryId = entity.categoryId,
+            severityId = entity.severityId,
+            siteId = entity.siteId,
+            locationDescription = entity.locationDescription.orEmpty(),
+            position = convertPositionDto(entity),
+            photoUrls = photoUrls,
+        )
+
+    /**
      * Converts the photo URLs of the full incident [dto] to the photo rows of the incident with [incidentLocalId],
      * keeping their order
      */
@@ -206,12 +277,12 @@ class IncidentConverter @Inject constructor(
     }
 
     /**
-     * Converts a stored photo to a domain [Photo]: its local file while it has one, otherwise its server URL
-     * resolved to an absolute one. Returns null for a row with neither
+     * Converts a stored photo to a domain [Photo]: its server URL, resolved to an absolute one, once it is
+     * uploaded (its local file is deleted then), otherwise its local file. Returns null for a row with neither
      */
     fun convertPhoto(entity: IncidentPhotoEntity): Photo? = when {
-        entity.localPath != null -> Photo.Local(entity.localPath)
         entity.remoteUrl != null -> Photo.Remote(resolve(entity.remoteUrl))
+        entity.localPath != null -> Photo.Local(entity.localPath)
         else -> null
     }
 
@@ -220,6 +291,13 @@ class IncidentConverter @Inject constructor(
         val lng = entity.positionLng ?: return null
         val accuracyM = entity.positionAccuracyM ?: return null
         return Position(lat, lng, accuracyM)
+    }
+
+    private fun convertPositionDto(entity: IncidentEntity): PositionDto? {
+        val lat = entity.positionLat ?: return null
+        val lng = entity.positionLng ?: return null
+        val accuracyM = entity.positionAccuracyM ?: return null
+        return PositionDto(lat, lng, accuracyM)
     }
 
     private fun resolve(url: String): String = baseUrl.resolve(url)?.toString() ?: url

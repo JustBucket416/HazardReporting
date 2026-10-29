@@ -7,6 +7,7 @@ import com.example.hazardreporting.domain.exception.NoConnectionException
 import com.example.hazardreporting.domain.exception.UnauthorizedException
 import com.example.hazardreporting.domain.interactor.CatalogInteractor
 import com.example.hazardreporting.domain.interactor.IncidentInteractor
+import com.example.hazardreporting.domain.interactor.LoginInteractor
 import com.example.hazardreporting.domain.model.Category
 import com.example.hazardreporting.domain.model.IncidentSummary
 import com.example.hazardreporting.domain.model.Severity
@@ -31,13 +32,15 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.plus
 
 /**
- * Manages the incident list screen's state. The stored incidents are shown as they are; a refresh pulls the
- * server's on top of them. When the list is opened right after signing in ([IncidentList.refreshOnOpen]),
- * it starts with a first load that shows skeleton rows, or an error card if it fails with nothing stored
+ * Manages the incident list screen's state. The stored incidents are shown as they are; a refresh pushes the
+ * pending changes and pulls the server's incidents on top of them. When the list is opened right after signing in
+ * ([IncidentList.refreshOnOpen]), it starts with a first load that shows skeleton rows, or an error card if it fails
+ * with nothing stored. A banner shows while the server rejects the session
  *
  * @param savedStateHandle holds the route and remembers that the opening refresh was started
  * @property incidentInteractor used for observing and refreshing the incidents
  * @param catalogInteractor used for naming each incident's category, severity and site
+ * @param loginInteractor used for observing whether the session is still valid
  * @property dispatchers used for launching off the main thread
  * @param logger used for logging unexpected exceptions
  *
@@ -47,6 +50,7 @@ class IncidentListViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val incidentInteractor: IncidentInteractor,
     catalogInteractor: CatalogInteractor,
+    loginInteractor: LoginInteractor,
     private val dispatchers: CoroutineDispatchers,
     logger: Logger,
 ) : BaseViewModel(logger) {
@@ -59,12 +63,16 @@ class IncidentListViewModel @Inject constructor(
      */
     val uiState: StateFlow<IncidentListUiState> = combine(
         incidentInteractor.observeMyIncidents(),
-        catalogInteractor.observeCategories(),
-        catalogInteractor.observeSeverities(),
-        catalogInteractor.observeSites(),
+        combine(
+            catalogInteractor.observeCategories(),
+            catalogInteractor.observeSeverities(),
+            catalogInteractor.observeSites(),
+            ::Catalog,
+        ),
         refreshStatus,
-    ) { incidents, categories, severities, sites, refresh ->
-        toUiState(incidents, categories, severities, sites, refresh)
+        loginInteractor.observeSessionInvalid(),
+    ) { incidents, catalog, refresh, isSessionInvalid ->
+        toUiState(incidents, catalog, refresh, isSessionInvalid)
     }.stateIn(
         scope = viewModelScope + exceptionHandler + dispatchers.default,
         started = SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS),
@@ -115,7 +123,7 @@ class IncidentListViewModel @Inject constructor(
             } catch (e: NoConnectionException) {
                 false
             } catch (e: UnauthorizedException) {
-                // The session-invalid banner replaces this with the synchroniser (issue 13)
+                // The interactor marked the session as invalid, which shows the banner
                 false
             }
 
@@ -131,14 +139,13 @@ class IncidentListViewModel @Inject constructor(
 
     private fun toUiState(
         incidents: List<IncidentSummary>,
-        categories: List<Category>,
-        severities: List<Severity>,
-        sites: List<Site>,
+        catalog: Catalog,
         refresh: RefreshStatus,
+        isSessionInvalid: Boolean,
     ): IncidentListUiState {
-        val categoriesById = categories.associateBy { it.id }
-        val severitiesById = severities.associateBy { it.id }
-        val sitesById = sites.associateBy { it.id }
+        val categoriesById = catalog.categories.associateBy { it.id }
+        val severitiesById = catalog.severities.associateBy { it.id }
+        val sitesById = catalog.sites.associateBy { it.id }
         val content = when {
             incidents.isNotEmpty() -> IncidentListContent.Incidents(
                 incidents.map { incident ->
@@ -159,8 +166,25 @@ class IncidentListViewModel @Inject constructor(
             refresh.hasFailed -> IncidentListContent.Error
             else -> IncidentListContent.Empty
         }
-        return IncidentListUiState(content = content, isRefreshing = refresh.inFlight == RefreshKind.Pull)
+        return IncidentListUiState(
+            content = content,
+            isRefreshing = refresh.inFlight == RefreshKind.Pull,
+            isSessionInvalid = isSessionInvalid,
+        )
     }
+
+    /**
+     * The stored catalog the rows are named from
+     *
+     * @property categories the stored categories
+     * @property severities the stored severities
+     * @property sites the stored sites
+     */
+    private data class Catalog(
+        val categories: List<Category>,
+        val severities: List<Severity>,
+        val sites: List<Site>,
+    )
 
     /**
      * What the screen knows about refreshing

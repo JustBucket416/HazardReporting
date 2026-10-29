@@ -13,4 +13,10 @@ interface SyncScheduler {
      * Returns at once; asking again while a push is already scheduled has no further effect
      */
     fun schedulePush()
+
+    /**
+     * Makes sure the pending changes are pushed every 15 minutes while the device is online, in case a scheduled
+     * push gave up. Returns at once; calling it again keeps the existing schedule
+     */
+    fun schedulePeriodicPush()
 }

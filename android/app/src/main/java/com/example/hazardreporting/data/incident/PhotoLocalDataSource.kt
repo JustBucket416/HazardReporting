@@ -65,6 +65,32 @@ class PhotoLocalDataSource @Inject constructor(
     }
 
     /**
+     * Returns the format of the photo file at [path], recognised by its first bytes, or null if the file
+     * doesn't exist or is in a format the server doesn't accept
+     *
+     * @throws IOException if the file exists but can't be read
+     */
+    fun formatOf(path: String): ImageFormat? {
+        val file = File(path)
+        if (!file.isFile) return null
+        return file.inputStream().use { ImageFormat.detect(it.readHeader()) }
+    }
+
+    /**
+     * Deletes the files in the photo directory that no photo row refers to, e.g. ones a form took or imported
+     * before the app was killed without saving or discarding it. Only files last modified before [modifiedBefore]
+     * go, so the file of a photo on a form that is still open, or that the camera is writing, is never deleted
+     *
+     * @param referencedPaths absolute paths of every file a photo row refers to
+     * @param modifiedBefore epoch milliseconds; newer files are kept
+     */
+    fun deleteUnreferencedPhotos(referencedPaths: Set<String>, modifiedBefore: Long) {
+        photosDirectory.listFiles()
+            ?.filter { it.isFile && it.absolutePath !in referencedPaths && it.lastModified() < modifiedBefore }
+            ?.forEach { it.delete() }
+    }
+
+    /**
      * Deletes the photo file at [path]. A path outside the photo directory is left alone
      */
     fun deletePhoto(path: String) {

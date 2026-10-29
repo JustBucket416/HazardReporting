@@ -150,6 +150,53 @@ class PhotoLocalDataSourceTest {
     }
 
     @Test
+    fun testFormatOf() {
+        val jpeg = File(dataSource.createPhotoFile()).apply { writeBytes(JPEG_CONTENT) }
+        val png = File(photosDirectory, "b.png").apply { writeBytes(PNG_CONTENT) }
+        val webp = File(photosDirectory, "c.webp").apply { writeBytes(WEBP_CONTENT) }
+
+        Truth.assertThat(dataSource.formatOf(jpeg.path)).isEqualTo(ImageFormat.Jpeg)
+        Truth.assertThat(dataSource.formatOf(png.path)).isEqualTo(ImageFormat.Png)
+        Truth.assertThat(dataSource.formatOf(webp.path)).isEqualTo(ImageFormat.Webp)
+    }
+
+    @Test
+    fun testFormatOf_ByContentNotName() {
+        // E.g. a HEIC picture an older version imported under a .jpg name
+        val file = File(dataSource.createPhotoFile()).apply { writeBytes(HEIC_CONTENT) }
+
+        Truth.assertThat(dataSource.formatOf(file.path)).isNull()
+    }
+
+    @Test
+    fun testFormatOf_Missing() {
+        Truth.assertThat(dataSource.formatOf(File(photosDirectory, "gone.jpg").path)).isNull()
+    }
+
+    @Test
+    fun testDeleteUnreferencedPhotos() {
+        val referencedOld = photoFile("referenced.jpg", lastModified = OLD)
+        val unreferencedOld = photoFile("orphan.jpg", lastModified = OLD)
+        val unreferencedNew = photoFile("open-form.jpg", lastModified = CUTOFF)
+        val outside = temporaryFolder.newFile("database.db").apply { setLastModified(OLD) }
+
+        dataSource.deleteUnreferencedPhotos(setOf(referencedOld.absolutePath), modifiedBefore = CUTOFF)
+
+        // Only an old file nobody refers to goes; a new one may belong to a form that is still open
+        Truth.assertThat(referencedOld.exists()).isTrue()
+        Truth.assertThat(unreferencedOld.exists()).isFalse()
+        Truth.assertThat(unreferencedNew.exists()).isTrue()
+        Truth.assertThat(outside.exists()).isTrue()
+    }
+
+    @Test
+    fun testDeleteUnreferencedPhotos_NoDirectory() {
+        dataSource.deleteUnreferencedPhotos(emptySet(), modifiedBefore = CUTOFF)
+
+        Truth.assertThat(photosDirectory.exists()).isFalse()
+    }
+
+    @Test
     fun testDeletePhoto() {
         val file = File(dataSource.createPhotoFile()).apply { writeBytes(JPEG_CONTENT) }
 
@@ -165,6 +212,14 @@ class PhotoLocalDataSourceTest {
         dataSource.deletePhoto(file.path)
 
         Truth.assertThat(file.exists()).isTrue()
+    }
+
+    private fun photoFile(name: String, lastModified: Long): File {
+        photosDirectory.mkdirs()
+        return File(photosDirectory, name).apply {
+            writeBytes(JPEG_CONTENT)
+            setLastModified(lastModified)
+        }
     }
 
     private fun verifyCopiedAsIs(content: ByteArray, expectedExtension: String) {
@@ -183,6 +238,8 @@ class PhotoLocalDataSourceTest {
 
     private companion object {
         const val SOURCE_URI = "content://media/picker/0/42"
+        const val CUTOFF = 1_793_000_000_000L
+        const val OLD = CUTOFF - 1_000L
         val JPEG_CONTENT = byteArrayOf(0xFF.toByte(), 0xD8.toByte(), 0xFF.toByte(), 0xE0.toByte(), 1, 2, 3)
         val PNG_CONTENT = byteArrayOf(0x89.toByte(), 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 1, 2, 3, 4, 5)
         val WEBP_CONTENT = "RIFF".toByteArray() + byteArrayOf(0, 0, 0, 0) + "WEBPVP8 ".toByteArray()

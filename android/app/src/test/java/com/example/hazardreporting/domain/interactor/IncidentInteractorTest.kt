@@ -2,6 +2,7 @@ package com.example.hazardreporting.domain.interactor
 
 import app.cash.turbine.test
 import com.example.hazardreporting.domain.exception.NoConnectionException
+import com.example.hazardreporting.domain.exception.UnauthorizedException
 import com.example.hazardreporting.domain.exception.ValidationException
 import com.example.hazardreporting.domain.model.Incident
 import com.example.hazardreporting.domain.model.IncidentDraft
@@ -13,6 +14,8 @@ import com.example.hazardreporting.domain.model.SyncState
 import com.example.hazardreporting.domain.repository.CatalogRepository
 import com.example.hazardreporting.domain.repository.IncidentRepository
 import com.example.hazardreporting.domain.repository.LocationProvider
+import com.example.hazardreporting.domain.repository.SessionRepository
+import com.example.hazardreporting.domain.repository.SyncRepository
 import com.example.hazardreporting.domain.repository.SyncScheduler
 import com.google.common.truth.Truth
 import io.mockk.Called
@@ -36,10 +39,19 @@ class IncidentInteractorTest {
 
     private val incidentRepository = mockk<IncidentRepository>()
     private val catalogRepository = mockk<CatalogRepository>()
+    private val syncRepository = mockk<SyncRepository>()
+    private val sessionRepository = mockk<SessionRepository>()
     private val locationProvider = mockk<LocationProvider>()
     private val syncScheduler = mockk<SyncScheduler>()
 
-    private val interactor = IncidentInteractor(incidentRepository, catalogRepository, locationProvider, syncScheduler)
+    private val interactor = IncidentInteractor(
+        incidentRepository,
+        catalogRepository,
+        syncRepository,
+        sessionRepository,
+        locationProvider,
+        syncScheduler,
+    )
 
     @Test
     fun testObserveMyIncidents() = runTest {
@@ -64,27 +76,81 @@ class IncidentInteractorTest {
 
     @Test
     fun testRefreshIncidents() = runTest {
+        coJustRun { syncRepository.push() }
         coJustRun { catalogRepository.refresh() }
         coJustRun { incidentRepository.pullSummaries() }
 
         interactor.refreshIncidents()
 
-        // The catalog comes first, so the pulled incidents can be named
+        // Pending changes go first, then the catalog, so the pulled incidents can be named
         coVerifySequence {
+            syncRepository.push()
             catalogRepository.refresh()
             incidentRepository.pullSummaries()
         }
     }
 
     @Test
+    fun testRefreshIncidents_PushNoConnection() {
+        coEvery { syncRepository.push() } throws NoConnectionException()
+
+        Assert.assertThrows(NoConnectionException::class.java) {
+            runTest { interactor.refreshIncidents() }
+        }
+
+        coVerifySequence { syncRepository.push() }
+        verify { sessionRepository wasNot Called }
+    }
+
+    @Test
     fun testRefreshIncidents_NoConnection() {
+        coJustRun { syncRepository.push() }
         coEvery { catalogRepository.refresh() } throws NoConnectionException()
 
         Assert.assertThrows(NoConnectionException::class.java) {
             runTest { interactor.refreshIncidents() }
         }
 
-        coVerifySequence { catalogRepository.refresh() }
+        coVerifySequence {
+            syncRepository.push()
+            catalogRepository.refresh()
+        }
+    }
+
+    @Test
+    fun testRefreshIncidents_PushUnauthorized() {
+        coEvery { syncRepository.push() } throws UnauthorizedException()
+        justRun { sessionRepository.markSessionInvalid() }
+
+        Assert.assertThrows(UnauthorizedException::class.java) {
+            runTest { interactor.refreshIncidents() }
+        }
+
+        // Shown as a banner; the technician stays signed in (ADR-0007)
+        coVerifySequence {
+            syncRepository.push()
+            sessionRepository.markSessionInvalid()
+        }
+    }
+
+    @Test
+    fun testRefreshIncidents_PullUnauthorized() {
+        // Nothing to push, so the pull is the first request to find the session rejected
+        coJustRun { syncRepository.push() }
+        coJustRun { catalogRepository.refresh() }
+        coEvery { incidentRepository.pullSummaries() } throws UnauthorizedException()
+        justRun { sessionRepository.markSessionInvalid() }
+
+        Assert.assertThrows(UnauthorizedException::class.java) {
+            runTest { interactor.refreshIncidents() }
+        }
+
+        coVerifySequence {
+            syncRepository.push()
+            catalogRepository.refresh()
+            incidentRepository.pullSummaries()
+            sessionRepository.markSessionInvalid()
+        }
     }
 
     @Test
@@ -108,6 +174,21 @@ class IncidentInteractorTest {
         interactor.loadIncidentDetails(7L, force = true)
 
         coVerifySequence { incidentRepository.loadDetails(7L, force = true) }
+    }
+
+    @Test
+    fun testLoadIncidentDetails_Unauthorized() {
+        coEvery { incidentRepository.loadDetails(7L, force = false) } throws UnauthorizedException()
+        justRun { sessionRepository.markSessionInvalid() }
+
+        Assert.assertThrows(UnauthorizedException::class.java) {
+            runTest { interactor.loadIncidentDetails(7L, force = false) }
+        }
+
+        coVerifySequence {
+            incidentRepository.loadDetails(7L, force = false)
+            sessionRepository.markSessionInvalid()
+        }
     }
 
     @Test

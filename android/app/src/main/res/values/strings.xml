@@ -34,6 +34,7 @@
     <string name="incident_list_load_failed">Couldn\'t load your incidents</string>
     <string name="incident_list_refresh_failed">Couldn\'t refresh — showing saved data</string>
     <string name="incident_list_report_saved">Report saved</string>
+    <string name="incident_list_session_invalid">Session no longer valid — log out and sign in again to sync.</string>
     <string name="incident_pending">Waiting to send</string>
     <string name="incident_status_change_notice">Status changed by an operator</string>
     <string name="incident_status_open">Open</string>
