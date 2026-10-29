@@ -1,10 +1,11 @@
 package com.example.hazardreporting.domain.exception
 
+import java.io.IOException
+
 /**
- * Thrown when the server no longer accepts the session, e.g. after the server was reset
- *
- * @param cause the server's rejection
+ * Thrown when the server no longer accepts the session, e.g. after the server was reset. An [IOException],
+ * so OkHttp can pass it on from an interceptor
  *
  * @author Roman Pliskin on 29.10.2026
  */
-class UnauthorizedException(cause: Throwable? = null) : Exception("The session is no longer valid", cause)
+class UnauthorizedException : IOException("The session is no longer valid")

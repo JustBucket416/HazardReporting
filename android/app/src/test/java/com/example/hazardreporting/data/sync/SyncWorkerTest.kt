@@ -10,6 +10,7 @@ import io.mockk.coEvery
 import io.mockk.coJustRun
 import io.mockk.coVerifySequence
 import io.mockk.mockk
+import java.io.IOException
 import kotlinx.coroutines.test.runTest
 import org.junit.Test
 
@@ -38,6 +39,14 @@ class SyncWorkerTest {
         coEvery { synchronizer.push() } throws NoConnectionException()
 
         // Tried again with backoff once the device is online
+        Truth.assertThat(worker.doWork()).isEqualTo(ListenableWorker.Result.retry())
+    }
+
+    @Test
+    fun testDoWork_ResponseNotRead() = runTest {
+        coEvery { synchronizer.push() } throws IOException()
+
+        // A connection lost while a response was read is retried too
         Truth.assertThat(worker.doWork()).isEqualTo(ListenableWorker.Result.retry())
     }
 

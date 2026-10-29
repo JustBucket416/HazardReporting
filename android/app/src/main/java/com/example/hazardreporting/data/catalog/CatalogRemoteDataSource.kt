@@ -3,13 +3,13 @@ package com.example.hazardreporting.data.catalog
 import com.example.hazardreporting.data.catalog.dto.CategoryDto
 import com.example.hazardreporting.data.catalog.dto.SeverityDto
 import com.example.hazardreporting.data.catalog.dto.SiteDto
-import com.example.hazardreporting.data.remote.mapRemoteErrors
+import com.example.hazardreporting.data.remote.RemoteErrorInterceptor
 import javax.inject.Inject
 
 /**
- * Downloads the catalog and maps failures to domain exceptions: a missing connection becomes
- * [com.example.hazardreporting.domain.exception.NoConnectionException] and a rejected session
- * [com.example.hazardreporting.domain.exception.UnauthorizedException]
+ * Downloads the catalog. A missing connection fails with
+ * [com.example.hazardreporting.domain.exception.NoConnectionException] and a rejected session with
+ * [com.example.hazardreporting.domain.exception.UnauthorizedException], both thrown by [RemoteErrorInterceptor]
  *
  * @property api used for making calls to the server
  *
@@ -22,15 +22,15 @@ class CatalogRemoteDataSource @Inject constructor(
     /**
      * Downloads every category
      */
-    suspend fun fetchCategories(): List<CategoryDto> = mapRemoteErrors { api.getCategories() }
+    suspend fun fetchCategories(): List<CategoryDto> = api.getCategories()
 
     /**
      * Downloads every severity
      */
-    suspend fun fetchSeverities(): List<SeverityDto> = mapRemoteErrors { api.getSeverities() }
+    suspend fun fetchSeverities(): List<SeverityDto> = api.getSeverities()
 
     /**
      * Downloads every site
      */
-    suspend fun fetchSites(): List<SiteDto> = mapRemoteErrors { api.getSites() }
+    suspend fun fetchSites(): List<SiteDto> = api.getSites()
 }

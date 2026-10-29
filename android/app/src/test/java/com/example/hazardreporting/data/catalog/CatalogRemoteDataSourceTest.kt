@@ -3,13 +3,10 @@ package com.example.hazardreporting.data.catalog
 import com.example.hazardreporting.data.catalog.dto.CategoryDto
 import com.example.hazardreporting.data.catalog.dto.SeverityDto
 import com.example.hazardreporting.data.catalog.dto.SiteDto
-import com.example.hazardreporting.domain.exception.NoConnectionException
-import com.example.hazardreporting.domain.exception.UnauthorizedException
 import com.google.common.truth.Truth
 import io.mockk.coEvery
 import io.mockk.coVerifySequence
 import io.mockk.mockk
-import java.io.IOException
 import kotlinx.coroutines.test.runTest
 import okhttp3.ResponseBody.Companion.toResponseBody
 import org.junit.Assert
@@ -63,24 +60,6 @@ class CatalogRemoteDataSourceTest {
         coVerifySequence { api.getSites() }
 
         Truth.assertThat(actualSites).isEqualTo(sites)
-    }
-
-    @Test
-    fun testFetchCategories_NoConnection() {
-        coEvery { api.getCategories() } throws IOException()
-
-        Assert.assertThrows(NoConnectionException::class.java) {
-            runTest { dataSource.fetchCategories() }
-        }
-    }
-
-    @Test
-    fun testFetchSeverities_Unauthorized() {
-        coEvery { api.getSeverities() } throws HttpException(Response.error<Any>(401, "".toResponseBody()))
-
-        Assert.assertThrows(UnauthorizedException::class.java) {
-            runTest { dataSource.fetchSeverities() }
-        }
     }
 
     @Test

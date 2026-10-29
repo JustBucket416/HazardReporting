@@ -2,15 +2,11 @@ package com.example.hazardreporting.data.session
 
 import com.example.hazardreporting.data.session.dto.LoginRequestDto
 import com.example.hazardreporting.data.session.dto.LoginResponseDto
-import com.example.hazardreporting.domain.exception.InvalidCredentialsException
-import com.example.hazardreporting.domain.exception.NoConnectionException
-import com.example.hazardreporting.domain.exception.UnauthorizedException
 import com.google.common.truth.Truth
 import io.mockk.coEvery
 import io.mockk.coJustRun
 import io.mockk.coVerifySequence
 import io.mockk.mockk
-import java.io.IOException
 import kotlinx.coroutines.test.runTest
 import okhttp3.ResponseBody.Companion.toResponseBody
 import org.junit.Assert
@@ -41,24 +37,6 @@ class SessionRemoteDataSourceTest {
     }
 
     @Test
-    fun testLogin_InvalidCredentials() {
-        coEvery { api.login(LOGIN_REQUEST) } throws httpException(401)
-
-        Assert.assertThrows(InvalidCredentialsException::class.java) {
-            runTest { dataSource.login(EMAIL, PASSWORD) }
-        }
-    }
-
-    @Test
-    fun testLogin_NoConnection() {
-        coEvery { api.login(LOGIN_REQUEST) } throws IOException()
-
-        Assert.assertThrows(NoConnectionException::class.java) {
-            runTest { dataSource.login(EMAIL, PASSWORD) }
-        }
-    }
-
-    @Test
     fun testLogin_ServerError() {
         val httpException = httpException(500)
 
@@ -79,24 +57,6 @@ class SessionRemoteDataSourceTest {
 
         // The token is sent explicitly, so a session that was never stored can be closed
         coVerifySequence { api.logout(AUTHORIZATION) }
-    }
-
-    @Test
-    fun testLogout_Unauthorized() {
-        coEvery { api.logout(AUTHORIZATION) } throws httpException(401)
-
-        Assert.assertThrows(UnauthorizedException::class.java) {
-            runTest { dataSource.logout(TOKEN) }
-        }
-    }
-
-    @Test
-    fun testLogout_NoConnection() {
-        coEvery { api.logout(AUTHORIZATION) } throws IOException()
-
-        Assert.assertThrows(NoConnectionException::class.java) {
-            runTest { dataSource.logout(TOKEN) }
-        }
     }
 
     private fun httpException(code: Int) = HttpException(Response.error<Any>(code, "".toResponseBody()))

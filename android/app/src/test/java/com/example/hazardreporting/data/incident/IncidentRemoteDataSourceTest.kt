@@ -6,15 +6,12 @@ import com.example.hazardreporting.data.incident.dto.IncidentSummaryDto
 import com.example.hazardreporting.data.incident.dto.UpdateIncidentRequestDto
 import com.example.hazardreporting.data.incident.dto.UploadResponseDto
 import com.example.hazardreporting.data.incident.dto.WithdrawIncidentRequestDto
-import com.example.hazardreporting.domain.exception.NoConnectionException
-import com.example.hazardreporting.domain.exception.UnauthorizedException
 import com.google.common.truth.Truth
 import io.mockk.coEvery
 import io.mockk.coVerifySequence
 import io.mockk.mockk
 import io.mockk.slot
 import java.io.File
-import java.io.IOException
 import kotlinx.coroutines.test.runTest
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.MultipartBody
@@ -47,24 +44,6 @@ class IncidentRemoteDataSourceTest {
     }
 
     @Test
-    fun testFetchSummaries_NoConnection() {
-        coEvery { api.getSummaries() } throws IOException()
-
-        Assert.assertThrows(NoConnectionException::class.java) {
-            runTest { dataSource.fetchSummaries() }
-        }
-    }
-
-    @Test
-    fun testFetchSummaries_Unauthorized() {
-        coEvery { api.getSummaries() } throws httpException(401)
-
-        Assert.assertThrows(UnauthorizedException::class.java) {
-            runTest { dataSource.fetchSummaries() }
-        }
-    }
-
-    @Test
     fun testFetchSummaries_ServerError() {
         val httpException = httpException(500)
 
@@ -91,15 +70,6 @@ class IncidentRemoteDataSourceTest {
     }
 
     @Test
-    fun testFetchIncident_NoConnection() {
-        coEvery { api.getIncident("inc-1") } throws IOException()
-
-        Assert.assertThrows(NoConnectionException::class.java) {
-            runTest { dataSource.fetchIncident("inc-1") }
-        }
-    }
-
-    @Test
     fun testFetchIncident_NotFound() {
         val httpException = httpException(404)
 
@@ -122,15 +92,6 @@ class IncidentRemoteDataSourceTest {
         Truth.assertThat(dataSource.createIncident(request)).isSameInstanceAs(incident)
 
         coVerifySequence { api.createIncident(request) }
-    }
-
-    @Test
-    fun testCreateIncident_NoConnection() {
-        coEvery { api.createIncident(any()) } throws IOException()
-
-        Assert.assertThrows(NoConnectionException::class.java) {
-            runTest { dataSource.createIncident(mockk()) }
-        }
     }
 
     @Test
@@ -169,15 +130,6 @@ class IncidentRemoteDataSourceTest {
 
         // Exactly { status: "withdrawn" }, the only body the server accepts for a withdrawal
         coVerifySequence { api.withdrawIncident("inc-1", WithdrawIncidentRequestDto("withdrawn")) }
-    }
-
-    @Test
-    fun testWithdrawIncident_Unauthorized() {
-        coEvery { api.withdrawIncident("inc-1", any()) } throws httpException(401)
-
-        Assert.assertThrows(UnauthorizedException::class.java) {
-            runTest { dataSource.withdrawIncident("inc-1") }
-        }
     }
 
     @Test

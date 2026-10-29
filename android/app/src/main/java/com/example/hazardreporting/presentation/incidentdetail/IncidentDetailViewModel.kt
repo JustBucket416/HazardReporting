@@ -148,7 +148,7 @@ class IncidentDetailViewModel @Inject constructor(
             } catch (e: NoConnectionException) {
                 false
             } catch (e: UnauthorizedException) {
-                // The interactor marked the session as invalid, which the list explains
+                // The interceptor marked the session as invalid, which the list explains
                 false
             }
 

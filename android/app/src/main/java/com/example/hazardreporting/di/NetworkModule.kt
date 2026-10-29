@@ -4,11 +4,11 @@ import com.example.hazardreporting.BuildConfig
 import com.example.hazardreporting.data.catalog.CatalogApi
 import com.example.hazardreporting.data.incident.IncidentApi
 import com.example.hazardreporting.data.remote.BASE_URL
+import com.example.hazardreporting.data.remote.RemoteErrorInterceptor
 import com.example.hazardreporting.data.remote.createRetrofit
 import com.example.hazardreporting.data.session.AuthInterceptor
 import com.example.hazardreporting.data.session.SessionApi
 import com.example.hazardreporting.data.session.SessionHolder
-import com.example.hazardreporting.data.session.UnauthorizedInterceptor
 import dagger.Module
 import dagger.Provides
 import javax.inject.Singleton
@@ -35,27 +35,27 @@ object NetworkModule {
     fun provideJson(): Json = Json { ignoreUnknownKeys = true }
 
     /**
-     * Provides the interceptor that marks the session as rejected in [sessionHolder] whenever the server answers
-     * a signed-in request with a 401
+     * Provides the interceptor that turns transport failures into domain exceptions, and marks the session as
+     * rejected in [sessionHolder] whenever the server answers a signed-in request with a 401
      */
     @Provides
     @Singleton
-    fun provideUnauthorizedInterceptor(sessionHolder: SessionHolder): UnauthorizedInterceptor =
-        UnauthorizedInterceptor(onUnauthorized = sessionHolder::markRejected)
+    fun provideRemoteErrorInterceptor(sessionHolder: SessionHolder): RemoteErrorInterceptor =
+        RemoteErrorInterceptor(onUnauthorized = sessionHolder::markRejected)
 
     /**
-     * Provides the OkHttp client. It reports rejected sessions with [unauthorizedInterceptor], authorises requests
+     * Provides the OkHttp client. It maps transport failures with [remoteErrorInterceptor], authorises requests
      * with [authInterceptor] and, in debug builds only, logs them with the token redacted
      */
     @Provides
     @Singleton
     fun provideOkHttpClient(
-        unauthorizedInterceptor: UnauthorizedInterceptor,
+        remoteErrorInterceptor: RemoteErrorInterceptor,
         authInterceptor: AuthInterceptor,
     ): OkHttpClient {
         val builder = OkHttpClient.Builder()
             // Before the token is added, so it can tell requests that name their own session
-            .addInterceptor(unauthorizedInterceptor)
+            .addInterceptor(remoteErrorInterceptor)
             .addInterceptor(authInterceptor)
 
         if (BuildConfig.DEBUG) {

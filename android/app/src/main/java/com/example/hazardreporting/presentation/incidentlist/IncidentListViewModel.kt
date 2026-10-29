@@ -171,7 +171,7 @@ class IncidentListViewModel @Inject constructor(
             } catch (e: NoConnectionException) {
                 false
             } catch (e: UnauthorizedException) {
-                // The interactor marked the session as invalid, which shows the banner
+                // The interceptor marked the session as invalid, which shows the banner
                 false
             }
 

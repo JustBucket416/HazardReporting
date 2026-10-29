@@ -9,7 +9,7 @@
 Dispatchers come from an injected `CoroutineDispatchers` class, which tests mock.
 
 **Errors.** Each layer catches only the exception types it owns:
-- The data layer translates `IOException` and `HttpException` into domain exceptions, and lets everything else through.
+- The data layer translates transport failures into domain exceptions in one OkHttp interceptor: no connection, a rejected session and wrong credentials. They extend `IOException`, as OkHttp requires of anything thrown from an interceptor. Other HTTP errors stay `HttpException`s for the data layer to handle, and everything else goes through.
 - The domain layer throws `ValidationException`.
 - ViewModels catch the domain exceptions they can show to the user.
 - Anything else reaches the shared `CoroutineExceptionHandler`. It logs through the `Logger` object (mocked with `mockkObject` in JVM tests) and calls the ViewModel's `onUnexpected` to clear loading state.
