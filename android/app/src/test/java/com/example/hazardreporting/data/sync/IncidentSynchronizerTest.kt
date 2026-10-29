@@ -617,16 +617,33 @@ class IncidentSynchronizerTest {
     }
 
     @Test
-    fun testPush_ServerErrorSkipsIncident() = runTest {
+    fun testPush_ServerErrorRetries() = runTest {
         server["inc-1"] = serverIncident("inc-1", synced(1, "inc-1"))
         storeIncident(edited(synced(1, "inc-1"), title = "Edit"), remote = REMOTE_A)
         storeIncident(report(2), remote = REMOTE_B)
-        coEvery { remoteDataSource.updateIncident("inc-1", any()) } throws httpException(500)
+        coEvery { remoteDataSource.updateIncident("inc-1", any()) } throws httpException(503)
 
-        synchronizer.push()
+        assertPushThrows(NoConnectionException::class.java)
 
+        // A failing server may recover: the push stops for a retry with backoff instead of skipping the incident
+        coVerify(exactly = 0) { remoteDataSource.createIncident(any()) }
+        verify(exactly = 0) { sessionHolder.markRejected() }
+        verify(exactly = 0) { logger.error(any(), any(), any()) }
         Truth.assertThat(incidents.getValue(1).syncState).isEqualTo(SyncState.PendingUpdate)
-        Truth.assertThat(incidents.getValue(2).syncState).isEqualTo(SyncState.Synced)
+        Truth.assertThat(incidents.getValue(2).syncState).isEqualTo(SyncState.PendingCreate)
+    }
+
+    @Test
+    fun testPush_ServerErrorOnUploadRetries() = runTest {
+        storeIncident(report(1), PATH_A)
+        coEvery { remoteDataSource.uploadPhoto(File(PATH_A), any()) } throws httpException(500)
+
+        assertPushThrows(NoConnectionException::class.java)
+
+        // Nothing was POSTed, so the report can still be deleted without a request, and its photo is kept
+        Truth.assertThat(incidents.getValue(1).syncState).isEqualTo(SyncState.PendingCreate)
+        Truth.assertThat(incidents.getValue(1).createAttempted).isFalse()
+        Truth.assertThat(files).containsExactly(PATH_A)
     }
 
     @Test

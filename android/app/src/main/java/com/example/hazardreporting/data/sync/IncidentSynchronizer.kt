@@ -10,6 +10,7 @@ import com.example.hazardreporting.data.incident.entity.IncidentEntity
 import com.example.hazardreporting.data.incident.entity.IncidentPhotoEntity
 import com.example.hazardreporting.data.incident.entity.IncidentWithPhotos
 import com.example.hazardreporting.data.session.SessionHolder
+import com.example.hazardreporting.domain.exception.NoConnectionException
 import com.example.hazardreporting.domain.exception.UnauthorizedException
 import com.example.hazardreporting.domain.model.SyncState
 import com.example.hazardreporting.utils.CoroutineDispatchers
@@ -34,10 +35,10 @@ import retrofit2.HttpException
  * 4. On 409, the change is dropped, the incident is downloaded again and overwrites the row, and a
  *    Status Change Notice is raised; a withdrawal refused because the incident is already withdrawn succeeded.
  *
- * A missing connection or a rejected session stops the push: the first throws for a retry, the second also
- * marks the session as rejected. Any other refusal, e.g. a 400 for a field or file, leaves only that incident
- * pending; it is logged, and the other incidents are still sent. Each push starts by deleting old photo files
- * no row refers to
+ * A missing connection, a server error (5xx) or a rejected session stops the push: the first two throw for a
+ * retry with backoff, the last also marks the session as rejected. Any other refusal, e.g. a 400 for a field or
+ * file, leaves only that incident pending; it is logged, and the other incidents are still sent. Each push starts
+ * by deleting old photo files no row refers to
  *
  * @property localDataSource used for reading and updating the stored incidents
  * @property remoteDataSource used for sending reports, edits, withdrawals and photos
@@ -67,7 +68,7 @@ class IncidentSynchronizer @Inject constructor(
      * Sends every pending change, waiting first for a push, pull or wipe in progress. Returns once nothing
      * is left to send, except changes the server refused for a reason other than a 409
      *
-     * @throws com.example.hazardreporting.domain.exception.NoConnectionException if the server can't be reached;
+     * @throws NoConnectionException if the server can't be reached or answers with a server error;
      * the changes not sent yet stay pending for a retry
      * @throws com.example.hazardreporting.domain.exception.UnauthorizedException if the server rejects the session,
      * which is then marked as rejected
@@ -125,6 +126,8 @@ class IncidentSynchronizer @Inject constructor(
             sessionHolder.markRejected()
             throw e
         } catch (e: HttpException) {
+            // A failing server may recover, so the push stops for a retry with backoff, as without a connection
+            if (e.code() >= HTTP_SERVER_ERROR) throw NoConnectionException(e)
             // Sending it again won't help, so it stays pending without holding up the other incidents
             logger.error(TAG, "The server refused the pending change of incident $localId (HTTP ${e.code()})", e)
         }
@@ -313,6 +316,7 @@ class IncidentSynchronizer @Inject constructor(
         const val STATUS_OPEN = "open"
         const val STATUS_WITHDRAWN = "withdrawn"
         const val HTTP_CONFLICT = 409
+        const val HTTP_SERVER_ERROR = 500
 
         /**
          * How old an unreferenced photo file must be before it is deleted. Far longer than a form stays open,
