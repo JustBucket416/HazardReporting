@@ -150,6 +150,8 @@ private fun LoginForm(
             modifier = Modifier.fillMaxWidth(),
             enabled = !uiState.isSigningIn,
             label = { Text(stringResource(R.string.login_email)) },
+            // The message itself is shown once, under the password field
+            isError = uiState.error?.isAboutAccount == true,
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email, imeAction = ImeAction.Next),
             singleLine = true,
         )

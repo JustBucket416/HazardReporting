@@ -48,14 +48,12 @@ object InteractorModule {
         incidentRepository: IncidentRepository,
         catalogRepository: CatalogRepository,
         syncRepository: SyncRepository,
-        sessionRepository: SessionRepository,
         locationProvider: LocationProvider,
         syncScheduler: SyncScheduler,
     ): IncidentInteractor = IncidentInteractor(
         incidentRepository,
         catalogRepository,
         syncRepository,
-        sessionRepository,
         locationProvider,
         syncScheduler,
     )

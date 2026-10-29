@@ -44,11 +44,9 @@ class IncidentRepositoryImpl @Inject constructor(
         .map { entities -> entities.map { converter.convertSummary(it) } }
         .flowOn(dispatchers.io)
 
-    override suspend fun pullSummaries() {
-        withContext(dispatchers.io) {
-            // Never during a push: summaries downloaded before a POST must not be merged into rows written after it
-            syncLock.withLock { pullSummariesLocked() }
-        }
+    override suspend fun pullSummaries() = withContext(dispatchers.io) {
+        // Never during a push: summaries downloaded before a POST must not be merged into rows written after it
+        syncLock.withLock { pullSummariesLocked() }
     }
 
     override fun observeIncident(localId: Long): Flow<Incident> = localDataSource.observeIncident(localId)
@@ -56,24 +54,22 @@ class IncidentRepositoryImpl @Inject constructor(
         .map { converter.convert(it) }
         .flowOn(dispatchers.io)
 
-    override suspend fun loadDetails(localId: Long, force: Boolean) {
-        withContext(dispatchers.io) {
-            val stored = localDataSource.getIncident(localId) ?: return@withContext
-            if (!force && stored.detailsLoaded) return@withContext
-            // A report the server doesn't know yet has all its details on the device
-            val serverId = stored.serverId ?: return@withContext
+    override suspend fun loadDetails(localId: Long, force: Boolean) = withContext(dispatchers.io) {
+        val stored = localDataSource.getIncident(localId) ?: return@withContext
+        if (!force && stored.detailsLoaded) return@withContext
+        // A report the server doesn't know yet has all its details on the device
+        val serverId = stored.serverId ?: return@withContext
 
-            val dto = remoteDataSource.fetchIncident(serverId)
-            localDataSource.inTransaction {
-                // Read again: the row may have changed while the download was in flight
-                val current = localDataSource.getIncident(localId) ?: return@inTransaction
-                if (current.syncState == SyncState.Synced) {
-                    localDataSource.updateIncident(converter.withDetails(current, dto))
-                    localDataSource.replacePhotos(localId, converter.convertPhotos(localId, dto))
-                } else {
-                    // A pending change keeps its report fields until the server accepts it
-                    localDataSource.updateIncident(converter.withStatus(current, dto))
-                }
+        val dto = remoteDataSource.fetchIncident(serverId)
+        localDataSource.inTransaction {
+            // Read again: the row may have changed while the download was in flight
+            val current = localDataSource.getIncident(localId) ?: return@inTransaction
+            if (current.syncState == SyncState.Synced) {
+                localDataSource.updateIncident(converter.withDetails(current, dto))
+                localDataSource.replacePhotos(localId, converter.convertPhotos(localId, dto))
+            } else {
+                // A pending change keeps its report fields until the server accepts it
+                localDataSource.updateIncident(converter.withStatus(current, dto))
             }
         }
     }
@@ -94,38 +90,32 @@ class IncidentRepositoryImpl @Inject constructor(
         }
     }
 
-    override suspend fun edit(localId: Long, draft: IncidentDraft, syncState: SyncState) {
-        withContext(dispatchers.io) {
-            localDataSource.inTransaction {
-                val current = localDataSource.getIncident(localId) ?: return@inTransaction
-                val storedPhotos = localDataSource.getPhotos(localId)
-                val edited = converter.withDraft(current, draft)
-                    .copy(syncState = syncState, localVersion = current.localVersion + 1)
-                localDataSource.updateIncident(edited)
-                // The files of photos the edit removed are left to the push's cleanup of unreferenced files,
-                // in case a form that is still open attaches them again
-                localDataSource.replacePhotos(localId, converter.convertPhotos(localId, draft.photos, storedPhotos))
-            }
+    override suspend fun edit(localId: Long, draft: IncidentDraft, syncState: SyncState) = withContext(dispatchers.io) {
+        localDataSource.inTransaction {
+            val current = localDataSource.getIncident(localId) ?: return@inTransaction
+            val storedPhotos = localDataSource.getPhotos(localId)
+            val edited = converter.withDraft(current, draft)
+                .copy(syncState = syncState, localVersion = current.localVersion + 1)
+            localDataSource.updateIncident(edited)
+            // The files of photos the edit removed are left to the push's cleanup of unreferenced files,
+            // in case a form that is still open attaches them again
+            localDataSource.replacePhotos(localId, converter.convertPhotos(localId, draft.photos, storedPhotos))
         }
     }
 
-    override suspend fun withdraw(localId: Long) {
-        withContext(dispatchers.io) {
-            localDataSource.inTransaction {
-                val current = localDataSource.getIncident(localId) ?: return@inTransaction
-                localDataSource.updateIncident(
-                    current.copy(syncState = SyncState.PendingWithdraw, localVersion = current.localVersion + 1)
-                )
-            }
+    override suspend fun withdraw(localId: Long) = withContext(dispatchers.io) {
+        localDataSource.inTransaction {
+            val current = localDataSource.getIncident(localId) ?: return@inTransaction
+            localDataSource.updateIncident(
+                current.copy(syncState = SyncState.PendingWithdraw, localVersion = current.localVersion + 1)
+            )
         }
     }
 
-    override suspend fun dismissStatusChangeNotice(localId: Long) {
-        withContext(dispatchers.io) {
-            localDataSource.inTransaction {
-                val current = localDataSource.getIncident(localId) ?: return@inTransaction
-                localDataSource.updateIncident(current.copy(statusChangeNoticePending = false))
-            }
+    override suspend fun dismissStatusChangeNotice(localId: Long) = withContext(dispatchers.io) {
+        localDataSource.inTransaction {
+            val current = localDataSource.getIncident(localId) ?: return@inTransaction
+            localDataSource.updateIncident(current.copy(statusChangeNoticePending = false))
         }
     }
 
@@ -137,8 +127,8 @@ class IncidentRepositoryImpl @Inject constructor(
         Photo.Local(photoLocalDataSource.importPhoto(sourceUri))
     }
 
-    override suspend fun deletePhoto(photo: Photo.Local) {
-        withContext(dispatchers.io) { photoLocalDataSource.deletePhoto(photo.path) }
+    override suspend fun deletePhoto(photo: Photo.Local) = withContext(dispatchers.io) {
+        photoLocalDataSource.deletePhoto(photo.path)
     }
 
     private suspend fun pullSummariesLocked() {

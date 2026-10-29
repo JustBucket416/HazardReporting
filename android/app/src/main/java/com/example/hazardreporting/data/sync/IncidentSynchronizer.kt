@@ -9,9 +9,7 @@ import com.example.hazardreporting.data.incident.dto.IncidentDto
 import com.example.hazardreporting.data.incident.entity.IncidentEntity
 import com.example.hazardreporting.data.incident.entity.IncidentPhotoEntity
 import com.example.hazardreporting.data.incident.entity.IncidentWithPhotos
-import com.example.hazardreporting.data.session.SessionHolder
 import com.example.hazardreporting.domain.exception.NoConnectionException
-import com.example.hazardreporting.domain.exception.UnauthorizedException
 import com.example.hazardreporting.domain.model.SyncState
 import com.example.hazardreporting.utils.CoroutineDispatchers
 import com.example.hazardreporting.utils.Logger
@@ -36,16 +34,15 @@ import retrofit2.HttpException
  *    Status Change Notice is raised; a withdrawal refused because the incident is already withdrawn succeeded.
  *
  * A missing connection, a server error (5xx) or a rejected session stops the push: the first two throw for a
- * retry with backoff, the last also marks the session as rejected. Any other refusal, e.g. a 400 for a field or
- * file, leaves only that incident pending; it is logged, and the other incidents are still sent. Each push starts
- * by deleting old photo files no row refers to
+ * retry with backoff. Any other refusal, e.g. a 400 for a field or file, leaves only that incident pending;
+ * it is logged, and the other incidents are still sent. Each push starts by deleting old photo files no row
+ * refers to
  *
  * @property localDataSource used for reading and updating the stored incidents
  * @property remoteDataSource used for sending reports, edits, withdrawals and photos
  * @property photoLocalDataSource used for reading and deleting photo files
  * @property converter used for converting between entities and DTOs
  * @property syncLock keeps pushes, pulls and logout's wipe apart
- * @property sessionHolder told when the server rejects the session
  * @property clock used for telling old photo files from new ones
  * @property logger used for logging changes the server refuses
  * @property dispatchers used for running on the IO dispatcher
@@ -58,7 +55,6 @@ class IncidentSynchronizer @Inject constructor(
     private val photoLocalDataSource: PhotoLocalDataSource,
     private val converter: IncidentConverter,
     private val syncLock: SyncLock,
-    private val sessionHolder: SessionHolder,
     private val clock: Clock,
     private val logger: Logger,
     private val dispatchers: CoroutineDispatchers,
@@ -70,15 +66,12 @@ class IncidentSynchronizer @Inject constructor(
      *
      * @throws NoConnectionException if the server can't be reached or answers with a server error;
      * the changes not sent yet stay pending for a retry
-     * @throws com.example.hazardreporting.domain.exception.UnauthorizedException if the server rejects the session,
-     * which is then marked as rejected
+     * @throws com.example.hazardreporting.domain.exception.UnauthorizedException if the server rejects the session
      */
-    suspend fun push() {
-        withContext(dispatchers.io) {
-            syncLock.withLock {
-                deleteOrphanedPhotos()
-                pushPendingIncidents()
-            }
+    suspend fun push() = withContext(dispatchers.io) {
+        syncLock.withLock {
+            deleteOrphanedPhotos()
+            pushPendingIncidents()
         }
     }
 
@@ -122,9 +115,6 @@ class IncidentSynchronizer @Inject constructor(
                 incident.isUnsentWithdrawal -> deleteUnsent(snapshot)
                 incident.syncState == SyncState.PendingWithdraw -> withdraw(snapshot)
             }
-        } catch (e: UnauthorizedException) {
-            sessionHolder.markRejected()
-            throw e
         } catch (e: HttpException) {
             // A failing server may recover, so the push stops for a retry with backoff, as without a connection
             if (e.code() >= HTTP_SERVER_ERROR) throw NoConnectionException(e)

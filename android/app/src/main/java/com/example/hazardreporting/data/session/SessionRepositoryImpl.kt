@@ -32,21 +32,17 @@ class SessionRepositoryImpl @Inject constructor(
         converter.convert(remoteDataSource.login(email, password))
     }
 
-    override suspend fun saveSession(session: Session) {
-        withContext(dispatchers.io) { sessionHolder.save(session) }
-    }
+    override suspend fun saveSession(session: Session) = withContext(dispatchers.io) { sessionHolder.save(session) }
 
-    override suspend fun closeSession(session: Session) {
-        withContext(dispatchers.io) {
-            try {
-                remoteDataSource.logout(session.token)
-            } catch (e: NoConnectionException) {
-                // Best effort: an unreachable server keeps a session nobody will use again
-            } catch (e: UnauthorizedException) {
-                // The server already forgot the session
-            } catch (e: HttpException) {
-                // Any other refusal leaves nothing for the device to do
-            }
+    override suspend fun closeSession(session: Session) = withContext(dispatchers.io) {
+        try {
+            remoteDataSource.logout(session.token)
+        } catch (e: NoConnectionException) {
+            // Best effort: an unreachable server keeps a session nobody will use again
+        } catch (e: UnauthorizedException) {
+            // The server already forgot the session
+        } catch (e: HttpException) {
+            // Any other refusal leaves nothing for the device to do
         }
     }
 
@@ -58,13 +54,7 @@ class SessionRepositoryImpl @Inject constructor(
         sessionHolder.session()
     }
 
-    override suspend fun clearSession() {
-        withContext(dispatchers.io) { sessionHolder.clear() }
-    }
+    override suspend fun clearSession() = withContext(dispatchers.io) { sessionHolder.clear() }
 
     override fun observeSessionInvalid(): Flow<Boolean> = sessionHolder.isRejected
-
-    override fun markSessionInvalid() {
-        sessionHolder.markRejected()
-    }
 }

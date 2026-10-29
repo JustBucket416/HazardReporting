@@ -18,7 +18,6 @@ import com.example.hazardreporting.domain.model.Position
 import com.example.hazardreporting.domain.model.Priority
 import com.example.hazardreporting.domain.model.SyncState
 import com.google.common.truth.Truth
-import okhttp3.HttpUrl.Companion.toHttpUrl
 import org.junit.Test
 
 /**
@@ -26,7 +25,7 @@ import org.junit.Test
  */
 class IncidentConverterTest {
 
-    private val converter = IncidentConverter(BASE_URL.toHttpUrl())
+    private val converter = IncidentConverter()
 
     @Test
     fun testConvertSummaryDto() {

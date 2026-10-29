@@ -23,15 +23,9 @@ class DeviceDataRepositoryImpl @Inject constructor(
     private val dispatchers: CoroutineDispatchers,
 ) : DeviceDataRepository {
 
-    override suspend fun clearDatabase() {
-        withContext(dispatchers.io) { databaseLocalDataSource.clearAllTables() }
-    }
+    override suspend fun clearDatabase() = withContext(dispatchers.io) { databaseLocalDataSource.clearAllTables() }
 
-    override suspend fun deletePhotoFiles() {
-        withContext(dispatchers.io) { photoLocalDataSource.deleteAllPhotos() }
-    }
+    override suspend fun deletePhotoFiles() = withContext(dispatchers.io) { photoLocalDataSource.deleteAllPhotos() }
 
-    override suspend fun clearImageCaches() {
-        withContext(dispatchers.io) { imageCacheLocalDataSource.clear() }
-    }
+    override suspend fun clearImageCaches() = withContext(dispatchers.io) { imageCacheLocalDataSource.clear() }
 }

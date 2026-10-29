@@ -6,7 +6,8 @@ package com.example.hazardreporting.presentation.login
  * @property email text of the email field
  * @property password text of the password field
  * @property isSigningIn whether a sign-in request is in flight
- * @property error why the last sign-in failed, shown under the password field
+ * @property error why the last sign-in failed, shown under the password field; one about the account also marks
+ * the email field
  *
  * @author Roman Pliskin on 29.10.2026
  */
@@ -20,22 +21,24 @@ data class LoginUiState(
 /**
  * Why signing in failed
  *
+ * @property isAboutAccount whether the entered account is at fault, rather than the connection
+ *
  * @author Roman Pliskin on 29.10.2026
  */
-enum class LoginError {
+enum class LoginError(val isAboutAccount: Boolean) {
 
     /**
      * The server rejected the email or password
      */
-    InvalidCredentials,
+    InvalidCredentials(isAboutAccount = true),
 
     /**
      * The server couldn't be reached
      */
-    NoConnection,
+    NoConnection(isAboutAccount = false),
 
     /**
      * The credentials belong to someone who isn't a technician
      */
-    NotTechnician,
+    NotTechnician(isAboutAccount = true),
 }

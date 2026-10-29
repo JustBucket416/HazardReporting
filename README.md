@@ -38,7 +38,7 @@ The domain language is in [GLOSSARY.md](GLOSSARY.md), the decisions and their re
    ```
    Open http://localhost:3000.
 
-3. **Android app**: open `android/` in Android Studio and run the `app` configuration on an **emulator**. The app reaches the server at `http://10.0.2.2:3001/`, which is how an emulator reaches the computer it runs on. On a physical device, change the `BASE_URL` constant in `android/app/src/main/java/com/example/hazardreporting/di/NetworkModule.kt` to your computer's LAN IP (for example `http://192.168.1.20:3001/`) and add that host to `android/app/src/debug/res/xml/network_security_config.xml`.
+3. **Android app**: open `android/` in Android Studio and run the `app` configuration on an **emulator**. The app reaches the server at `http://10.0.2.2:3001/`, which is how an emulator reaches the computer it runs on. On a physical device, change the `BASE_URL` constant in `android/app/src/main/java/com/example/hazardreporting/data/remote/RetrofitFactory.kt` to your computer's LAN IP (for example `http://192.168.1.20:3001/`) and add that host to `android/app/src/debug/res/xml/network_security_config.xml`.
 
 ## Demo accounts
 

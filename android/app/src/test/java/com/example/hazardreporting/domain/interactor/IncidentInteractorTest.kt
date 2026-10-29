@@ -15,7 +15,6 @@ import com.example.hazardreporting.domain.model.SyncState
 import com.example.hazardreporting.domain.repository.CatalogRepository
 import com.example.hazardreporting.domain.repository.IncidentRepository
 import com.example.hazardreporting.domain.repository.LocationProvider
-import com.example.hazardreporting.domain.repository.SessionRepository
 import com.example.hazardreporting.domain.repository.SyncRepository
 import com.example.hazardreporting.domain.repository.SyncScheduler
 import com.google.common.truth.Truth
@@ -42,7 +41,6 @@ class IncidentInteractorTest {
     private val incidentRepository = mockk<IncidentRepository>()
     private val catalogRepository = mockk<CatalogRepository>()
     private val syncRepository = mockk<SyncRepository>()
-    private val sessionRepository = mockk<SessionRepository>()
     private val locationProvider = mockk<LocationProvider>()
     private val syncScheduler = mockk<SyncScheduler>()
 
@@ -50,7 +48,6 @@ class IncidentInteractorTest {
         incidentRepository,
         catalogRepository,
         syncRepository,
-        sessionRepository,
         locationProvider,
         syncScheduler,
     )
@@ -101,7 +98,6 @@ class IncidentInteractorTest {
         }
 
         coVerifySequence { syncRepository.push() }
-        verify { sessionRepository wasNot Called }
     }
 
     @Test
@@ -122,17 +118,13 @@ class IncidentInteractorTest {
     @Test
     fun testRefreshIncidents_PushUnauthorized() {
         coEvery { syncRepository.push() } throws UnauthorizedException()
-        justRun { sessionRepository.markSessionInvalid() }
 
         Assert.assertThrows(UnauthorizedException::class.java) {
             runTest { interactor.refreshIncidents() }
         }
 
-        // Shown as a banner; the technician stays signed in (ADR-0007)
-        coVerifySequence {
-            syncRepository.push()
-            sessionRepository.markSessionInvalid()
-        }
+        // Nothing is pulled with a rejected session
+        coVerifySequence { syncRepository.push() }
     }
 
     @Test
@@ -141,7 +133,6 @@ class IncidentInteractorTest {
         coJustRun { syncRepository.push() }
         coJustRun { catalogRepository.refresh() }
         coEvery { incidentRepository.pullSummaries() } throws UnauthorizedException()
-        justRun { sessionRepository.markSessionInvalid() }
 
         Assert.assertThrows(UnauthorizedException::class.java) {
             runTest { interactor.refreshIncidents() }
@@ -151,7 +142,6 @@ class IncidentInteractorTest {
             syncRepository.push()
             catalogRepository.refresh()
             incidentRepository.pullSummaries()
-            sessionRepository.markSessionInvalid()
         }
     }
 
@@ -181,16 +171,12 @@ class IncidentInteractorTest {
     @Test
     fun testLoadIncidentDetails_Unauthorized() {
         coEvery { incidentRepository.loadDetails(7L, force = false) } throws UnauthorizedException()
-        justRun { sessionRepository.markSessionInvalid() }
 
         Assert.assertThrows(UnauthorizedException::class.java) {
             runTest { interactor.loadIncidentDetails(7L, force = false) }
         }
 
-        coVerifySequence {
-            incidentRepository.loadDetails(7L, force = false)
-            sessionRepository.markSessionInvalid()
-        }
+        coVerifySequence { incidentRepository.loadDetails(7L, force = false) }
     }
 
     @Test

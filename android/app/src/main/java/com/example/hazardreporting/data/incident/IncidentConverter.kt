@@ -8,7 +8,7 @@ import com.example.hazardreporting.data.incident.dto.UpdateIncidentRequestDto
 import com.example.hazardreporting.data.incident.entity.IncidentEntity
 import com.example.hazardreporting.data.incident.entity.IncidentPhotoEntity
 import com.example.hazardreporting.data.incident.entity.IncidentWithPhotos
-import com.example.hazardreporting.data.remote.BaseUrl
+import com.example.hazardreporting.data.remote.BASE_URL
 import com.example.hazardreporting.domain.model.Incident
 import com.example.hazardreporting.domain.model.IncidentDetails
 import com.example.hazardreporting.domain.model.IncidentDraft
@@ -19,21 +19,19 @@ import com.example.hazardreporting.domain.model.Position
 import com.example.hazardreporting.domain.model.Priority
 import com.example.hazardreporting.domain.model.SyncState
 import javax.inject.Inject
-import okhttp3.HttpUrl
+import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 
 /**
  * Converts incidents from the server's DTOs to Room entities, and from entities to domain models.
- * Photo URLs are stored as the server sends them, relative to it, and resolved against [baseUrl]
+ * Photo URLs are stored as the server sends them, relative to it, and resolved against [BASE_URL]
  * only for the domain
- *
- * @property baseUrl the server's root, which relative photo URLs are resolved against
  *
  * @author Roman Pliskin on 29.10.2026
  */
-class IncidentConverter @Inject constructor(
-    @param:BaseUrl private val baseUrl: HttpUrl,
-) {
+class IncidentConverter @Inject constructor() {
+
+    private val baseUrl = BASE_URL.toHttpUrl()
 
     /**
      * Converts a summary of an incident the device doesn't have yet to a new, synced row without details

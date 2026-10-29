@@ -12,7 +12,6 @@ import com.example.hazardreporting.data.incident.dto.UpdateIncidentRequestDto
 import com.example.hazardreporting.data.incident.entity.IncidentEntity
 import com.example.hazardreporting.data.incident.entity.IncidentPhotoEntity
 import com.example.hazardreporting.data.incident.entity.IncidentWithPhotos
-import com.example.hazardreporting.data.session.SessionHolder
 import com.example.hazardreporting.domain.exception.NoConnectionException
 import com.example.hazardreporting.domain.exception.UnauthorizedException
 import com.example.hazardreporting.domain.model.SyncState
@@ -36,7 +35,6 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
-import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.ResponseBody.Companion.toResponseBody
 import org.junit.Before
 import org.junit.Test
@@ -58,9 +56,8 @@ class IncidentSynchronizerTest {
     private val localDataSource = mockk<IncidentLocalDataSource>()
     private val remoteDataSource = mockk<IncidentRemoteDataSource>()
     private val photoLocalDataSource = mockk<PhotoLocalDataSource>()
-    private val converter = IncidentConverter("http://10.0.2.2:3001/".toHttpUrl())
+    private val converter = IncidentConverter()
     private val syncLock = SyncLock()
-    private val sessionHolder = mockk<SessionHolder>()
     private val clock = Clock.fixed(Instant.ofEpochMilli(NOW), ZoneOffset.UTC)
     private val logger = mockk<Logger>()
     private val dispatchers = mockk<CoroutineDispatchers>()
@@ -102,7 +99,6 @@ class IncidentSynchronizerTest {
         }
         every { photoLocalDataSource.deletePhoto(any()) } answers { files -= firstArg<String>() }
         justRun { photoLocalDataSource.deleteUnreferencedPhotos(any(), any()) }
-        justRun { sessionHolder.markRejected() }
         justRun { logger.error(any(), any(), any()) }
 
         synchronizer = IncidentSynchronizer(
@@ -111,7 +107,6 @@ class IncidentSynchronizerTest {
             photoLocalDataSource,
             converter,
             syncLock,
-            sessionHolder,
             clock,
             logger,
             dispatchers,
@@ -549,8 +544,7 @@ class IncidentSynchronizerTest {
 
         assertPushThrows(UnauthorizedException::class.java)
 
-        // Stops at once and marks the session as rejected; nothing is lost
-        verify(exactly = 1) { sessionHolder.markRejected() }
+        // Stops at once; nothing is lost
         coVerify(exactly = 1) { remoteDataSource.createIncident(any()) }
         Truth.assertThat(incidents.values.map { it.syncState }).containsExactly(
             SyncState.PendingCreate,
@@ -565,7 +559,6 @@ class IncidentSynchronizerTest {
 
         assertPushThrows(UnauthorizedException::class.java)
 
-        verify(exactly = 1) { sessionHolder.markRejected() }
         Truth.assertThat(files).containsExactly(PATH_A)
     }
 
@@ -579,7 +572,6 @@ class IncidentSynchronizerTest {
 
         // Stops for a retry; the session is fine
         coVerify(exactly = 1) { remoteDataSource.createIncident(any()) }
-        verify(exactly = 0) { sessionHolder.markRejected() }
         Truth.assertThat(incidents.values.map { it.syncState }).containsExactly(
             SyncState.PendingCreate,
             SyncState.PendingCreate,
@@ -627,7 +619,6 @@ class IncidentSynchronizerTest {
 
         // A failing server may recover: the push stops for a retry with backoff instead of skipping the incident
         coVerify(exactly = 0) { remoteDataSource.createIncident(any()) }
-        verify(exactly = 0) { sessionHolder.markRejected() }
         verify(exactly = 0) { logger.error(any(), any(), any()) }
         Truth.assertThat(incidents.getValue(1).syncState).isEqualTo(SyncState.PendingUpdate)
         Truth.assertThat(incidents.getValue(2).syncState).isEqualTo(SyncState.PendingCreate)

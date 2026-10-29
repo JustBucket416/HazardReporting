@@ -52,9 +52,4 @@ interface SessionRepository {
      * stays signed in (ADR-0007); signing in again replaces it
      */
     fun observeSessionInvalid(): Flow<Boolean>
-
-    /**
-     * Records that the server rejected the signed-in session
-     */
-    fun markSessionInvalid()
 }

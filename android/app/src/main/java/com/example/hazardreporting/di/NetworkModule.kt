@@ -3,26 +3,20 @@ package com.example.hazardreporting.di
 import com.example.hazardreporting.BuildConfig
 import com.example.hazardreporting.data.catalog.CatalogApi
 import com.example.hazardreporting.data.incident.IncidentApi
-import com.example.hazardreporting.data.remote.BaseUrl
+import com.example.hazardreporting.data.remote.BASE_URL
+import com.example.hazardreporting.data.remote.createRetrofit
 import com.example.hazardreporting.data.session.AuthInterceptor
 import com.example.hazardreporting.data.session.SessionApi
+import com.example.hazardreporting.data.session.SessionHolder
+import com.example.hazardreporting.data.session.UnauthorizedInterceptor
 import dagger.Module
 import dagger.Provides
 import javax.inject.Singleton
 import kotlinx.serialization.json.Json
-import okhttp3.HttpUrl
-import okhttp3.HttpUrl.Companion.toHttpUrl
-import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
-import retrofit2.converter.kotlinx.serialization.asConverterFactory
 import retrofit2.create
-
-/**
- * Base URL of the local server, as seen from the Android emulator
- */
-const val BASE_URL = "http://10.0.2.2:3001/"
 
 /**
  * Provides the network stack: JSON, OkHttp, Retrofit and the Retrofit interfaces
@@ -31,8 +25,6 @@ const val BASE_URL = "http://10.0.2.2:3001/"
  */
 @Module
 object NetworkModule {
-
-    private const val JSON_MEDIA_TYPE = "application/json"
 
     /**
      * Provides the JSON format for the server's bodies. Unknown keys are ignored,
@@ -43,13 +35,27 @@ object NetworkModule {
     fun provideJson(): Json = Json { ignoreUnknownKeys = true }
 
     /**
-     * Provides the OkHttp client. It authorises requests with [authInterceptor] and, in debug builds only,
-     * logs them with the token redacted
+     * Provides the interceptor that marks the session as rejected in [sessionHolder] whenever the server answers
+     * a signed-in request with a 401
      */
     @Provides
     @Singleton
-    fun provideOkHttpClient(authInterceptor: AuthInterceptor): OkHttpClient {
+    fun provideUnauthorizedInterceptor(sessionHolder: SessionHolder): UnauthorizedInterceptor =
+        UnauthorizedInterceptor(onUnauthorized = sessionHolder::markRejected)
+
+    /**
+     * Provides the OkHttp client. It reports rejected sessions with [unauthorizedInterceptor], authorises requests
+     * with [authInterceptor] and, in debug builds only, logs them with the token redacted
+     */
+    @Provides
+    @Singleton
+    fun provideOkHttpClient(
+        unauthorizedInterceptor: UnauthorizedInterceptor,
+        authInterceptor: AuthInterceptor,
+    ): OkHttpClient {
         val builder = OkHttpClient.Builder()
+            // Before the token is added, so it can tell requests that name their own session
+            .addInterceptor(unauthorizedInterceptor)
             .addInterceptor(authInterceptor)
 
         if (BuildConfig.DEBUG) {
@@ -63,24 +69,11 @@ object NetworkModule {
     }
 
     /**
-     * Provides [BASE_URL] as the [BaseUrl] that Retrofit and the data layer's converters use
+     * Provides Retrofit for the server at [BASE_URL]
      */
     @Provides
     @Singleton
-    @BaseUrl
-    fun provideBaseUrl(): HttpUrl = BASE_URL.toHttpUrl()
-
-    /**
-     * Provides Retrofit for the server at [baseUrl]
-     */
-    @Provides
-    @Singleton
-    fun provideRetrofit(okHttpClient: OkHttpClient, json: Json, @BaseUrl baseUrl: HttpUrl): Retrofit =
-        Retrofit.Builder()
-            .client(okHttpClient)
-            .addConverterFactory(json.asConverterFactory(JSON_MEDIA_TYPE.toMediaType()))
-            .baseUrl(baseUrl)
-            .build()
+    fun provideRetrofit(okHttpClient: OkHttpClient, json: Json): Retrofit = createRetrofit(okHttpClient, json)
 
     /**
      * Provides the Retrofit interface for the session routes

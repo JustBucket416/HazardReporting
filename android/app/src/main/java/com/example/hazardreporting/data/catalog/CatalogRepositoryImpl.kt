@@ -28,17 +28,15 @@ class CatalogRepositoryImpl @Inject constructor(
     private val dispatchers: CoroutineDispatchers,
 ) : CatalogRepository {
 
-    override suspend fun refresh() {
-        withContext(dispatchers.io) {
-            // Downloads everything first, so a failed download leaves the stored catalog untouched
-            val categories = remoteDataSource.fetchCategories()
-            val severities = remoteDataSource.fetchSeverities()
-            val sites = remoteDataSource.fetchSites()
+    override suspend fun refresh() = withContext(dispatchers.io) {
+        // Downloads everything first, so a failed download leaves the stored catalog untouched
+        val categories = remoteDataSource.fetchCategories()
+        val severities = remoteDataSource.fetchSeverities()
+        val sites = remoteDataSource.fetchSites()
 
-            localDataSource.replaceCategories(categories.mapIndexed { position, dto -> converter.convert(dto, position) })
-            localDataSource.replaceSeverities(severities.map { converter.convert(it) })
-            localDataSource.replaceSites(sites.mapIndexed { position, dto -> converter.convert(dto, position) })
-        }
+        localDataSource.replaceCategories(categories.mapIndexed { position, dto -> converter.convert(dto, position) })
+        localDataSource.replaceSeverities(severities.map { converter.convert(it) })
+        localDataSource.replaceSites(sites.mapIndexed { position, dto -> converter.convert(dto, position) })
     }
 
     override fun observeCategories(): Flow<List<Category>> = localDataSource.observeCategories()

@@ -186,15 +186,6 @@ class SessionRepositoryImplTest {
         Truth.assertThat(repository.observeSessionInvalid()).isSameInstanceAs(isRejected)
     }
 
-    @Test
-    fun testMarkSessionInvalid() {
-        justRun { sessionHolder.markRejected() }
-
-        repository.markSessionInvalid()
-
-        verify(exactly = 1) { sessionHolder.markRejected() }
-    }
-
     private companion object {
         const val EMAIL = "tech1@example.com"
         const val PASSWORD = "password"
