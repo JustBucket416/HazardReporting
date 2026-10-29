@@ -3,8 +3,10 @@ package com.example.hazardreporting.data.incident.dao
 import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.Query
+import androidx.room.Transaction
 import androidx.room.Update
 import com.example.hazardreporting.data.incident.entity.IncidentEntity
+import com.example.hazardreporting.data.incident.entity.IncidentWithPhotos
 import kotlinx.coroutines.flow.Flow
 
 /**
@@ -22,16 +24,35 @@ interface IncidentDao {
     fun observeAll(): Flow<List<IncidentEntity>>
 
     /**
+     * Observes the incident with [localId] together with its photos; emits null while there is no such incident
+     */
+    @Transaction
+    @Query("SELECT * FROM incidents WHERE localId = :localId")
+    fun observeWithPhotos(localId: Long): Flow<IncidentWithPhotos?>
+
+    /**
      * Returns every incident
      */
     @Query("SELECT * FROM incidents")
     suspend fun getAll(): List<IncidentEntity>
 
     /**
+     * Returns the incident with [localId], or null if there is none
+     */
+    @Query("SELECT * FROM incidents WHERE localId = :localId")
+    suspend fun getByLocalId(localId: Long): IncidentEntity?
+
+    /**
      * Inserts [incidents]
      */
     @Insert
     suspend fun insertAll(incidents: List<IncidentEntity>)
+
+    /**
+     * Replaces the stored row of [incident], matched by local id
+     */
+    @Update
+    suspend fun update(incident: IncidentEntity)
 
     /**
      * Replaces the stored rows of [incidents], matched by local id

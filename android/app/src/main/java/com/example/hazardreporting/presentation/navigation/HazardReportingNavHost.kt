@@ -14,6 +14,7 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.toRoute
 import com.example.hazardreporting.R
 import com.example.hazardreporting.presentation.common.PlaceholderScreen
+import com.example.hazardreporting.presentation.incidentdetail.IncidentDetailRoute
 import com.example.hazardreporting.presentation.incidentlist.IncidentListRoute
 import com.example.hazardreporting.presentation.login.LoginRoute
 
@@ -58,7 +59,10 @@ fun HazardReportingNavHost(
             )
         }
         composable<IncidentDetail> {
-            PlaceholderScreen(title = stringResource(R.string.incident_detail_title))
+            IncidentDetailRoute(
+                viewModel = viewModel(factory = viewModelFactory),
+                onBack = { navController.popBackStack() },
+            )
         }
         composable<IncidentForm> { backStackEntry ->
             val isEditing = backStackEntry.toRoute<IncidentForm>().localId != null

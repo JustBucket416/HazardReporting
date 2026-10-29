@@ -9,6 +9,7 @@ import com.example.hazardreporting.data.catalog.entity.CategoryEntity
 import com.example.hazardreporting.data.catalog.entity.SeverityEntity
 import com.example.hazardreporting.data.catalog.entity.SiteEntity
 import com.example.hazardreporting.data.incident.dao.IncidentDao
+import com.example.hazardreporting.data.incident.dao.IncidentPhotoDao
 import com.example.hazardreporting.data.incident.entity.IncidentEntity
 import com.example.hazardreporting.data.incident.entity.IncidentPhotoEntity
 
@@ -48,4 +49,9 @@ abstract class HazardReportingDatabase : RoomDatabase() {
      * Returns the DAO of the `incidents` table
      */
     abstract fun incidentDao(): IncidentDao
+
+    /**
+     * Returns the DAO of the `incident_photos` table
+     */
+    abstract fun incidentPhotoDao(): IncidentPhotoDao
 }

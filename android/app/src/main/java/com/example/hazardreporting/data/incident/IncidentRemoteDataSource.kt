@@ -1,5 +1,6 @@
 package com.example.hazardreporting.data.incident
 
+import com.example.hazardreporting.data.incident.dto.IncidentDto
 import com.example.hazardreporting.data.incident.dto.IncidentSummaryDto
 import com.example.hazardreporting.data.remote.mapRemoteErrors
 import javax.inject.Inject
@@ -21,4 +22,9 @@ class IncidentRemoteDataSource @Inject constructor(
      * Downloads the caller's incident summaries
      */
     suspend fun fetchSummaries(): List<IncidentSummaryDto> = mapRemoteErrors { api.getSummaries() }
+
+    /**
+     * Downloads the caller's incident with [serverId]
+     */
+    suspend fun fetchIncident(serverId: String): IncidentDto = mapRemoteErrors { api.getIncident(serverId) }
 }

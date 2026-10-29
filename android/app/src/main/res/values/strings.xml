@@ -5,6 +5,9 @@
     <string name="error_unexpected">Something went wrong</string>
     <string name="placeholder_coming_soon">Coming soon</string>
     <string name="action_retry">Retry</string>
+    <string name="action_back">Back</string>
+    <string name="action_more_options">More options</string>
+    <string name="photo_load_failed">Couldn\'t load photo</string>
     <!-- Stands in for a value that is unset or not known yet -->
     <string name="value_missing">—</string>
 
@@ -38,6 +41,26 @@
     <string name="incident_status_withdrawn">Withdrawn</string>
     <string name="incident_status_unknown">Unknown</string>
     <string name="incident_detail_title">Incident</string>
+    <string name="incident_detail_refresh_failed">Couldn\'t refresh — showing saved details</string>
+    <string name="incident_details_not_downloaded">Details not downloaded</string>
+    <string name="incident_action_edit">Edit</string>
+    <string name="incident_action_withdraw">Withdraw…</string>
+    <!-- Content description of a photo in the pager, e.g. "Photo 1 of 3" -->
+    <string name="incident_photo_description">Photo %1$d of %2$d</string>
+    <string name="incident_field_category">Category</string>
+    <string name="incident_field_site">Site</string>
+    <string name="incident_field_reported">Reported</string>
+    <string name="incident_field_priority">Priority</string>
+    <string name="incident_field_description">Description</string>
+    <string name="incident_field_location_description">Location description</string>
+    <string name="incident_field_position">Position</string>
+    <!-- Accuracy in metres, then latitude and longitude, e.g. "±12 m · 53.50534, -2.20063" -->
+    <string name="incident_position_value">±%1$d m · %2$.5f, %3$.5f</string>
+    <string name="incident_priority_low">Low</string>
+    <string name="incident_priority_medium">Medium</string>
+    <string name="incident_priority_high">High</string>
+    <string name="incident_priority_urgent">Urgent</string>
+    <string name="incident_priority_unknown">Unknown</string>
     <string name="incident_form_new_title">New report</string>
     <string name="incident_form_edit_title">Edit report</string>
 </resources>

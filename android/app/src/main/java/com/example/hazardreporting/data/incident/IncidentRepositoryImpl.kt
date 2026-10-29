@@ -1,12 +1,14 @@
 package com.example.hazardreporting.data.incident
 
 import com.example.hazardreporting.data.incident.entity.IncidentEntity
+import com.example.hazardreporting.domain.model.Incident
 import com.example.hazardreporting.domain.model.IncidentSummary
 import com.example.hazardreporting.domain.model.SyncState
 import com.example.hazardreporting.domain.repository.IncidentRepository
 import com.example.hazardreporting.utils.CoroutineDispatchers
 import javax.inject.Inject
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
@@ -62,6 +64,33 @@ class IncidentRepositoryImpl @Inject constructor(
                 localDataSource.insertIncidents(inserted)
                 localDataSource.updateIncidents(updated)
                 localDataSource.deleteIncidents(gone.map { it.localId })
+            }
+        }
+    }
+
+    override fun observeIncident(localId: Long): Flow<Incident> = localDataSource.observeIncident(localId)
+        .filterNotNull()
+        .map { converter.convert(it) }
+        .flowOn(dispatchers.io)
+
+    override suspend fun loadDetails(localId: Long, force: Boolean) {
+        withContext(dispatchers.io) {
+            val stored = localDataSource.getIncident(localId) ?: return@withContext
+            if (!force && stored.detailsLoaded) return@withContext
+            // A report the server doesn't know yet has all its details on the device
+            val serverId = stored.serverId ?: return@withContext
+
+            val dto = remoteDataSource.fetchIncident(serverId)
+            localDataSource.inTransaction {
+                // Read again: the row may have changed while the download was in flight
+                val current = localDataSource.getIncident(localId) ?: return@inTransaction
+                if (current.syncState == SyncState.Synced) {
+                    localDataSource.updateIncident(converter.withDetails(current, dto))
+                    localDataSource.replacePhotos(localId, converter.convertPhotos(localId, dto))
+                } else {
+                    // A pending change keeps its report fields until the server accepts it
+                    localDataSource.updateIncident(converter.withStatus(current, dto))
+                }
             }
         }
     }

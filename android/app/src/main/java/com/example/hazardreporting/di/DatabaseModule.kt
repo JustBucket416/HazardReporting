@@ -6,6 +6,7 @@ import com.example.hazardreporting.data.catalog.dao.CategoryDao
 import com.example.hazardreporting.data.catalog.dao.SeverityDao
 import com.example.hazardreporting.data.catalog.dao.SiteDao
 import com.example.hazardreporting.data.incident.dao.IncidentDao
+import com.example.hazardreporting.data.incident.dao.IncidentPhotoDao
 import com.example.hazardreporting.data.local.HazardReportingDatabase
 import dagger.Module
 import dagger.Provides
@@ -52,4 +53,10 @@ object DatabaseModule {
      */
     @Provides
     fun provideIncidentDao(database: HazardReportingDatabase): IncidentDao = database.incidentDao()
+
+    /**
+     * Provides the DAO of the `incident_photos` table
+     */
+    @Provides
+    fun provideIncidentPhotoDao(database: HazardReportingDatabase): IncidentPhotoDao = database.incidentPhotoDao()
 }

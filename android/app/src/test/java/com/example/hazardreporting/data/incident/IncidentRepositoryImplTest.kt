@@ -1,9 +1,13 @@
 package com.example.hazardreporting.data.incident
 
 import app.cash.turbine.test
+import com.example.hazardreporting.data.incident.dto.IncidentDto
 import com.example.hazardreporting.data.incident.dto.IncidentSummaryDto
 import com.example.hazardreporting.data.incident.entity.IncidentEntity
+import com.example.hazardreporting.data.incident.entity.IncidentPhotoEntity
+import com.example.hazardreporting.data.incident.entity.IncidentWithPhotos
 import com.example.hazardreporting.domain.exception.NoConnectionException
+import com.example.hazardreporting.domain.model.Incident
 import com.example.hazardreporting.domain.model.IncidentSummary
 import com.example.hazardreporting.domain.model.SyncState
 import com.example.hazardreporting.utils.CoroutineDispatchers
@@ -214,6 +218,138 @@ class IncidentRepositoryImplTest {
         coVerifySequence { remoteDataSource.fetchSummaries() }
     }
 
+    @Test
+    fun testObserveIncident() = runTest {
+        val withPhotos = IncidentWithPhotos(SYNCED_ROW, photos = emptyList())
+        val incident = mockk<Incident>()
+
+        every { localDataSource.observeIncident(LOCAL_ID) } returns flowOf(null, withPhotos)
+        every { converter.convert(withPhotos) } returns incident
+
+        repository.observeIncident(LOCAL_ID).test {
+            // Nothing is emitted while the incident isn't stored
+            Truth.assertThat(awaitItem()).isSameInstanceAs(incident)
+            awaitComplete()
+        }
+
+        verifySequence {
+            localDataSource.observeIncident(LOCAL_ID)
+            converter.convert(withPhotos)
+        }
+    }
+
+    @Test
+    fun testLoadDetails_NotForcedDetailsLoaded() = runTest {
+        coEvery { localDataSource.getIncident(LOCAL_ID) } returns SYNCED_ROW.copy(detailsLoaded = true)
+
+        repository.loadDetails(LOCAL_ID, force = false)
+
+        // Downloaded details are reused: no network call
+        coVerifySequence { localDataSource.getIncident(LOCAL_ID) }
+    }
+
+    @Test
+    fun testLoadDetails_NotForcedDetailsNotLoaded() = runTest {
+        verifyDownloadsDetails(stored = SYNCED_ROW, force = false)
+    }
+
+    @Test
+    fun testLoadDetails_ForcedDetailsLoaded() = runTest {
+        verifyDownloadsDetails(stored = SYNCED_ROW.copy(detailsLoaded = true), force = true)
+    }
+
+    @Test
+    fun testLoadDetails_ForcedDetailsNotLoaded() = runTest {
+        verifyDownloadsDetails(stored = SYNCED_ROW, force = true)
+    }
+
+    @Test
+    fun testLoadDetails_UnknownToServer() = runTest {
+        val unsent = SYNCED_ROW.copy(serverId = null, detailsLoaded = true, syncState = SyncState.PendingCreate)
+
+        coEvery { localDataSource.getIncident(LOCAL_ID) } returns unsent
+
+        repository.loadDetails(LOCAL_ID, force = true)
+
+        // Its details are all on the device; the server has nothing to add
+        coVerifySequence { localDataSource.getIncident(LOCAL_ID) }
+    }
+
+    @Test
+    fun testLoadDetails_NotStored() = runTest {
+        coEvery { localDataSource.getIncident(LOCAL_ID) } returns null
+
+        repository.loadDetails(LOCAL_ID, force = true)
+
+        coVerifySequence { localDataSource.getIncident(LOCAL_ID) }
+    }
+
+    @Test
+    fun testLoadDetails_PendingChange() = runTest {
+        val pending = SYNCED_ROW.copy(detailsLoaded = true, syncState = SyncState.PendingUpdate)
+        val dto = mockk<IncidentDto>()
+        val updated = mockk<IncidentEntity>()
+
+        coEvery { localDataSource.getIncident(LOCAL_ID) } returns pending
+        coEvery { remoteDataSource.fetchIncident("inc-1") } returns dto
+        every { converter.withStatus(pending, dto) } returns updated
+        coJustRun { localDataSource.updateIncident(updated) }
+
+        repository.loadDetails(LOCAL_ID, force = true)
+
+        // The pending report fields and photos stay; only the status and update time are taken
+        coVerifySequence {
+            localDataSource.getIncident(LOCAL_ID)
+            remoteDataSource.fetchIncident("inc-1")
+            localDataSource.inTransaction<Unit>(any())
+            localDataSource.getIncident(LOCAL_ID)
+            converter.withStatus(pending, dto)
+            localDataSource.updateIncident(updated)
+        }
+    }
+
+    @Test
+    fun testLoadDetails_NoConnection() {
+        coEvery { localDataSource.getIncident(LOCAL_ID) } returns SYNCED_ROW
+        coEvery { remoteDataSource.fetchIncident("inc-1") } throws NoConnectionException()
+
+        Assert.assertThrows(NoConnectionException::class.java) {
+            runTest { repository.loadDetails(LOCAL_ID, force = false) }
+        }
+
+        // Nothing is written, so the details stay "not downloaded"
+        coVerifySequence {
+            localDataSource.getIncident(LOCAL_ID)
+            remoteDataSource.fetchIncident("inc-1")
+        }
+    }
+
+    private suspend fun verifyDownloadsDetails(stored: IncidentEntity, force: Boolean) {
+        val dto = mockk<IncidentDto>()
+        val updated = mockk<IncidentEntity>()
+        val photos = listOf(mockk<IncidentPhotoEntity>())
+
+        coEvery { localDataSource.getIncident(LOCAL_ID) } returns stored
+        coEvery { remoteDataSource.fetchIncident("inc-1") } returns dto
+        every { converter.withDetails(stored, dto) } returns updated
+        every { converter.convertPhotos(LOCAL_ID, dto) } returns photos
+        coJustRun { localDataSource.updateIncident(updated) }
+        coJustRun { localDataSource.replacePhotos(LOCAL_ID, photos) }
+
+        repository.loadDetails(LOCAL_ID, force)
+
+        coVerifySequence {
+            localDataSource.getIncident(LOCAL_ID)
+            remoteDataSource.fetchIncident("inc-1")
+            localDataSource.inTransaction<Unit>(any())
+            localDataSource.getIncident(LOCAL_ID)
+            converter.withDetails(stored, dto)
+            localDataSource.updateIncident(updated)
+            converter.convertPhotos(LOCAL_ID, dto)
+            localDataSource.replacePhotos(LOCAL_ID, photos)
+        }
+    }
+
     private fun stubWrites(
         inserted: List<IncidentEntity> = emptyList(),
         updated: List<IncidentEntity> = emptyList(),
@@ -225,6 +361,7 @@ class IncidentRepositoryImplTest {
     }
 
     private companion object {
+        const val LOCAL_ID = 1L
         const val CREATED_AT = 1_793_015_100_000L
 
         val SUMMARY = IncidentSummaryDto(

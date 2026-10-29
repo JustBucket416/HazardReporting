@@ -2,6 +2,7 @@ package com.example.hazardreporting.domain.interactor
 
 import app.cash.turbine.test
 import com.example.hazardreporting.domain.exception.NoConnectionException
+import com.example.hazardreporting.domain.model.Incident
 import com.example.hazardreporting.domain.model.IncidentStatus
 import com.example.hazardreporting.domain.model.IncidentSummary
 import com.example.hazardreporting.domain.model.SyncState
@@ -73,6 +74,29 @@ class IncidentInteractorTest {
         }
 
         coVerifySequence { catalogRepository.refresh() }
+    }
+
+    @Test
+    fun testObserveIncident() = runTest {
+        val incident = mockk<Incident>()
+
+        every { incidentRepository.observeIncident(7L) } returns flowOf(incident)
+
+        interactor.observeIncident(7L).test {
+            Truth.assertThat(awaitItem()).isSameInstanceAs(incident)
+            awaitComplete()
+        }
+
+        verifySequence { incidentRepository.observeIncident(7L) }
+    }
+
+    @Test
+    fun testLoadIncidentDetails() = runTest {
+        coJustRun { incidentRepository.loadDetails(7L, force = true) }
+
+        interactor.loadIncidentDetails(7L, force = true)
+
+        coVerifySequence { incidentRepository.loadDetails(7L, force = true) }
     }
 
     private fun summary(

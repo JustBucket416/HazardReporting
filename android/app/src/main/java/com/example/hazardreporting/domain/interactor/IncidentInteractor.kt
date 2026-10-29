@@ -1,5 +1,6 @@
 package com.example.hazardreporting.domain.interactor
 
+import com.example.hazardreporting.domain.model.Incident
 import com.example.hazardreporting.domain.model.IncidentStatus
 import com.example.hazardreporting.domain.model.IncidentSummary
 import com.example.hazardreporting.domain.model.SyncState
@@ -42,5 +43,21 @@ class IncidentInteractor(
     suspend fun refreshIncidents() {
         catalogRepository.refresh()
         incidentRepository.pullSummaries()
+    }
+
+    /**
+     * Observes the incident with [localId], with its details once they are downloaded
+     */
+    fun observeIncident(localId: Long): Flow<Incident> = incidentRepository.observeIncident(localId)
+
+    /**
+     * Downloads the details of the incident with [localId] if [force] is set or they were never downloaded.
+     * Downloaded details are reused until the technician refreshes them (ADR-0006)
+     *
+     * @throws com.example.hazardreporting.domain.exception.NoConnectionException if the server can't be reached
+     * @throws com.example.hazardreporting.domain.exception.UnauthorizedException if the server rejects the session
+     */
+    suspend fun loadIncidentDetails(localId: Long, force: Boolean) {
+        incidentRepository.loadDetails(localId, force)
     }
 }

@@ -2,7 +2,10 @@ package com.example.hazardreporting.data.incident
 
 import androidx.room.withTransaction
 import com.example.hazardreporting.data.incident.dao.IncidentDao
+import com.example.hazardreporting.data.incident.dao.IncidentPhotoDao
 import com.example.hazardreporting.data.incident.entity.IncidentEntity
+import com.example.hazardreporting.data.incident.entity.IncidentPhotoEntity
+import com.example.hazardreporting.data.incident.entity.IncidentWithPhotos
 import com.example.hazardreporting.data.local.HazardReportingDatabase
 import javax.inject.Inject
 import kotlinx.coroutines.flow.Flow
@@ -12,12 +15,14 @@ import kotlinx.coroutines.flow.Flow
  *
  * @property database runs several writes as one transaction
  * @property incidentDao access to the `incidents` table
+ * @property photoDao access to the `incident_photos` table
  *
  * @author Roman Pliskin on 29.10.2026
  */
 class IncidentLocalDataSource @Inject constructor(
     private val database: HazardReportingDatabase,
     private val incidentDao: IncidentDao,
+    private val photoDao: IncidentPhotoDao,
 ) {
 
     /**
@@ -31,15 +36,32 @@ class IncidentLocalDataSource @Inject constructor(
     fun observeIncidents(): Flow<List<IncidentEntity>> = incidentDao.observeAll()
 
     /**
+     * Observes the stored incident with [localId] together with its photos; emits null while there is none
+     */
+    fun observeIncident(localId: Long): Flow<IncidentWithPhotos?> = incidentDao.observeWithPhotos(localId)
+
+    /**
      * Returns every stored incident
      */
     suspend fun getIncidents(): List<IncidentEntity> = incidentDao.getAll()
+
+    /**
+     * Returns the stored incident with [localId], or null if there is none
+     */
+    suspend fun getIncident(localId: Long): IncidentEntity? = incidentDao.getByLocalId(localId)
 
     /**
      * Stores the new [incidents]
      */
     suspend fun insertIncidents(incidents: List<IncidentEntity>) {
         incidentDao.insertAll(incidents)
+    }
+
+    /**
+     * Replaces the stored row of [incident]
+     */
+    suspend fun updateIncident(incident: IncidentEntity) {
+        incidentDao.update(incident)
     }
 
     /**
@@ -54,5 +76,12 @@ class IncidentLocalDataSource @Inject constructor(
      */
     suspend fun deleteIncidents(localIds: List<Long>) {
         incidentDao.deleteAll(localIds)
+    }
+
+    /**
+     * Replaces every stored photo of the incident with [incidentLocalId] with [photos]
+     */
+    suspend fun replacePhotos(incidentLocalId: Long, photos: List<IncidentPhotoEntity>) {
+        photoDao.replaceForIncident(incidentLocalId, photos)
     }
 }

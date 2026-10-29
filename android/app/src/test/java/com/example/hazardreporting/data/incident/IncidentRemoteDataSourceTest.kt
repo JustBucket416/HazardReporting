@@ -1,5 +1,6 @@
 package com.example.hazardreporting.data.incident
 
+import com.example.hazardreporting.data.incident.dto.IncidentDto
 import com.example.hazardreporting.data.incident.dto.IncidentSummaryDto
 import com.example.hazardreporting.domain.exception.NoConnectionException
 import com.example.hazardreporting.domain.exception.UnauthorizedException
@@ -63,6 +64,41 @@ class IncidentRemoteDataSourceTest {
 
         val thrown = Assert.assertThrows(HttpException::class.java) {
             runTest { dataSource.fetchSummaries() }
+        }
+
+        Truth.assertThat(thrown).isSameInstanceAs(httpException)
+    }
+
+    @Test
+    fun testFetchIncident() = runTest {
+        val incident = mockk<IncidentDto>()
+
+        coEvery { api.getIncident("inc-1") } returns incident
+
+        val actualIncident = dataSource.fetchIncident("inc-1")
+
+        coVerifySequence { api.getIncident("inc-1") }
+
+        Truth.assertThat(actualIncident).isSameInstanceAs(incident)
+    }
+
+    @Test
+    fun testFetchIncident_NoConnection() {
+        coEvery { api.getIncident("inc-1") } throws IOException()
+
+        Assert.assertThrows(NoConnectionException::class.java) {
+            runTest { dataSource.fetchIncident("inc-1") }
+        }
+    }
+
+    @Test
+    fun testFetchIncident_NotFound() {
+        val httpException = httpException(404)
+
+        coEvery { api.getIncident("inc-1") } throws httpException
+
+        val thrown = Assert.assertThrows(HttpException::class.java) {
+            runTest { dataSource.fetchIncident("inc-1") }
         }
 
         Truth.assertThat(thrown).isSameInstanceAs(httpException)

@@ -2,6 +2,7 @@ package com.example.hazardreporting.di
 
 import android.content.Context
 import androidx.lifecycle.ViewModelProvider
+import coil3.ImageLoader
 import com.example.hazardreporting.data.session.SessionHolder
 import dagger.BindsInstance
 import dagger.Component
@@ -19,6 +20,7 @@ import kotlinx.coroutines.CoroutineScope
         AppModule::class,
         DatabaseModule::class,
         DataStoreModule::class,
+        ImageLoaderModule::class,
         InteractorModule::class,
         NetworkModule::class,
         RepositoryModule::class,
@@ -37,6 +39,11 @@ interface AppComponent {
      * Returns the holder of the in-memory session, so the application can load it at startup
      */
     fun sessionHolder(): SessionHolder
+
+    /**
+     * Returns Coil's image loader, which the application hands to Coil as its singleton
+     */
+    fun imageLoader(): ImageLoader
 
     /**
      * Returns the factory that creates every ViewModel

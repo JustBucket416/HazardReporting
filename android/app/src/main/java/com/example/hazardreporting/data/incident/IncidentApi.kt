@@ -1,7 +1,9 @@
 package com.example.hazardreporting.data.incident
 
+import com.example.hazardreporting.data.incident.dto.IncidentDto
 import com.example.hazardreporting.data.incident.dto.IncidentSummaryDto
 import retrofit2.http.GET
+import retrofit2.http.Path
 
 /**
  * Retrofit interface for the server's technician incident routes
@@ -15,4 +17,10 @@ interface IncidentApi {
      */
     @GET("incidents/summary")
     suspend fun getSummaries(): List<IncidentSummaryDto>
+
+    /**
+     * Returns the caller's incident with server id [id]
+     */
+    @GET("incidents/{id}")
+    suspend fun getIncident(@Path("id") id: String): IncidentDto
 }

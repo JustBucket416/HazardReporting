@@ -1,7 +1,10 @@
 package com.example.hazardreporting.data.incident
 
 import com.example.hazardreporting.data.incident.dao.IncidentDao
+import com.example.hazardreporting.data.incident.dao.IncidentPhotoDao
 import com.example.hazardreporting.data.incident.entity.IncidentEntity
+import com.example.hazardreporting.data.incident.entity.IncidentPhotoEntity
+import com.example.hazardreporting.data.incident.entity.IncidentWithPhotos
 import com.example.hazardreporting.data.local.HazardReportingDatabase
 import com.google.common.truth.Truth
 import io.mockk.coEvery
@@ -21,8 +24,53 @@ class IncidentLocalDataSourceTest {
 
     private val database = mockk<HazardReportingDatabase>()
     private val incidentDao = mockk<IncidentDao>()
+    private val photoDao = mockk<IncidentPhotoDao>()
 
-    private val dataSource = IncidentLocalDataSource(database, incidentDao)
+    private val dataSource = IncidentLocalDataSource(database, incidentDao, photoDao)
+
+    @Test
+    fun testObserveIncident() {
+        val flow = mockk<Flow<IncidentWithPhotos?>>()
+
+        every { incidentDao.observeWithPhotos(1L) } returns flow
+
+        Truth.assertThat(dataSource.observeIncident(1L)).isSameInstanceAs(flow)
+
+        verifySequence { incidentDao.observeWithPhotos(1L) }
+    }
+
+    @Test
+    fun testGetIncident() = runTest {
+        val incident = mockk<IncidentEntity>()
+
+        coEvery { incidentDao.getByLocalId(1L) } returns incident
+
+        Truth.assertThat(dataSource.getIncident(1L)).isSameInstanceAs(incident)
+
+        coVerifySequence { incidentDao.getByLocalId(1L) }
+    }
+
+    @Test
+    fun testUpdateIncident() = runTest {
+        val incident = mockk<IncidentEntity>()
+
+        coJustRun { incidentDao.update(incident) }
+
+        dataSource.updateIncident(incident)
+
+        coVerifySequence { incidentDao.update(incident) }
+    }
+
+    @Test
+    fun testReplacePhotos() = runTest {
+        val photos = listOf(mockk<IncidentPhotoEntity>())
+
+        coJustRun { photoDao.replaceForIncident(1L, photos) }
+
+        dataSource.replacePhotos(1L, photos)
+
+        coVerifySequence { photoDao.replaceForIncident(1L, photos) }
+    }
 
     @Test
     fun testObserveIncidents() {
