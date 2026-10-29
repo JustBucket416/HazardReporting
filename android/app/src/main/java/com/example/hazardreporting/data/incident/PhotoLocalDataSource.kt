@@ -2,22 +2,27 @@ package com.example.hazardreporting.data.incident
 
 import android.content.Context
 import androidx.core.net.toUri
+import java.io.BufferedInputStream
 import java.io.File
 import java.io.FileNotFoundException
 import java.io.IOException
+import java.io.InputStream
 import java.util.UUID
 import javax.inject.Inject
 
 /**
  * Stores photo files in the app's private `files/photos/` directory, which the camera writes to through
- * a `FileProvider` and gallery picks are copied into
+ * a `FileProvider` and gallery picks are copied into. Every stored file is in a format the server accepts
+ * ([ImageFormat]); a picked picture in any other format is re-encoded as JPEG on import
  *
  * @property context gives access to the app's files and to the content of picked pictures
+ * @property transcoder re-encodes picked pictures the server wouldn't accept
  *
  * @author Roman Pliskin on 29.10.2026
  */
 class PhotoLocalDataSource @Inject constructor(
     private val context: Context,
+    private val transcoder: ImageTranscoder,
 ) {
 
     private val photosDirectory: File
@@ -26,26 +31,37 @@ class PhotoLocalDataSource @Inject constructor(
     /**
      * Returns the absolute path of a new, not yet existing JPEG file in the photo directory
      */
-    fun createPhotoFile(): String = newPhotoFile(JPEG_EXTENSION).absolutePath
+    fun createPhotoFile(): String = newPhotoFile(ImageFormat.Jpeg).absolutePath
 
     /**
-     * Copies the picture at [sourceUri] into a new file in the photo directory, keeping its image type
+     * Copies the picture at [sourceUri] into a new file in the photo directory. A JPEG, PNG or WebP picture,
+     * recognised by its first bytes, is copied as it is; anything else, e.g. HEIC, is re-encoded as JPEG,
+     * because the server would refuse it
      *
      * @return the absolute path of the copy
-     * @throws IOException if the picture can't be read or written; no partial copy is left behind
+     * @throws IOException if the picture can't be read, decoded or written; no partial copy is left behind
      */
     fun importPhoto(sourceUri: String): String {
         val uri = sourceUri.toUri()
-        val resolver = context.contentResolver
-        val target = newPhotoFile(extensionOf(resolver.getType(uri)))
-        try {
-            val input = resolver.openInputStream(uri) ?: throw FileNotFoundException("Can't open $sourceUri")
-            input.use { source -> target.outputStream().use { source.copyTo(it) } }
-        } catch (e: IOException) {
-            target.delete()
-            throw e
+        val input = context.contentResolver.openInputStream(uri) ?: throw FileNotFoundException("Can't open $sourceUri")
+        return BufferedInputStream(input).use { source ->
+            source.mark(ImageFormat.HEADER_SIZE)
+            val format = ImageFormat.detect(source.readHeader())
+            source.reset()
+
+            val target = newPhotoFile(format ?: ImageFormat.Jpeg)
+            try {
+                if (format != null) {
+                    target.outputStream().use { source.copyTo(it) }
+                } else {
+                    transcoder.transcodeToJpeg(sourceUri, target)
+                }
+            } catch (e: IOException) {
+                target.delete()
+                throw e
+            }
+            target.absolutePath
         }
-        return target.absolutePath
     }
 
     /**
@@ -56,25 +72,25 @@ class PhotoLocalDataSource @Inject constructor(
         if (file.canonicalFile.parentFile == photosDirectory.canonicalFile) file.delete()
     }
 
-    private fun newPhotoFile(extension: String): File {
+    private fun newPhotoFile(format: ImageFormat): File {
         val directory = photosDirectory
         directory.mkdirs()
-        return File(directory, "${UUID.randomUUID()}.$extension")
+        return File(directory, "${UUID.randomUUID()}.${format.extension}")
     }
 
-    // Only the types the server accepts keep their own extension; anything else is named as a JPEG
-    private fun extensionOf(mimeType: String?): String = when (mimeType) {
-        PNG_MIME_TYPE -> PNG_EXTENSION
-        WEBP_MIME_TYPE -> WEBP_EXTENSION
-        else -> JPEG_EXTENSION
+    // Reads up to the header's size; a shorter stream gives a shorter header, which matches no format
+    private fun InputStream.readHeader(): ByteArray {
+        val header = ByteArray(ImageFormat.HEADER_SIZE)
+        var length = 0
+        while (length < header.size) {
+            val read = read(header, length, header.size - length)
+            if (read < 0) break
+            length += read
+        }
+        return header.copyOf(length)
     }
 
     private companion object {
         const val PHOTOS_DIRECTORY = "photos"
-        const val JPEG_EXTENSION = "jpg"
-        const val PNG_EXTENSION = "png"
-        const val WEBP_EXTENSION = "webp"
-        const val PNG_MIME_TYPE = "image/png"
-        const val WEBP_MIME_TYPE = "image/webp"
     }
 }

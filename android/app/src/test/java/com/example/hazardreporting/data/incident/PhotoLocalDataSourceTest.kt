@@ -5,9 +5,12 @@ import android.content.Context
 import android.net.Uri
 import com.google.common.truth.Truth
 import io.mockk.every
+import io.mockk.justRun
 import io.mockk.mockk
 import io.mockk.mockkStatic
 import io.mockk.unmockkStatic
+import io.mockk.verify
+import io.mockk.verifySequence
 import java.io.File
 import java.io.FileNotFoundException
 import java.io.IOException
@@ -31,6 +34,7 @@ class PhotoLocalDataSourceTest {
     private val context = mockk<Context>()
     private val contentResolver = mockk<ContentResolver>()
     private val uri = mockk<Uri>()
+    private val transcoder = mockk<ImageTranscoder>()
 
     private lateinit var photosDirectory: File
     private lateinit var dataSource: PhotoLocalDataSource
@@ -43,7 +47,7 @@ class PhotoLocalDataSourceTest {
         every { context.contentResolver } returns contentResolver
         photosDirectory = File(temporaryFolder.root, "photos")
 
-        dataSource = PhotoLocalDataSource(context)
+        dataSource = PhotoLocalDataSource(context, transcoder)
     }
 
     @After
@@ -65,47 +69,56 @@ class PhotoLocalDataSourceTest {
     }
 
     @Test
-    fun testImportPhoto() {
-        every { contentResolver.getType(uri) } returns "image/png"
-        every { contentResolver.openInputStream(uri) } returns CONTENT.inputStream()
+    fun testImportPhoto_Jpeg() {
+        verifyCopiedAsIs(JPEG_CONTENT, expectedExtension = "jpg")
+    }
+
+    @Test
+    fun testImportPhoto_Png() {
+        verifyCopiedAsIs(PNG_CONTENT, expectedExtension = "png")
+    }
+
+    @Test
+    fun testImportPhoto_Webp() {
+        verifyCopiedAsIs(WEBP_CONTENT, expectedExtension = "webp")
+    }
+
+    @Test
+    fun testImportPhoto_Heic() {
+        every { contentResolver.openInputStream(uri) } returns HEIC_CONTENT.inputStream()
+        every { transcoder.transcodeToJpeg(SOURCE_URI, any()) } answers { secondArg<File>().writeBytes(JPEG_CONTENT) }
 
         val path = dataSource.importPhoto(SOURCE_URI)
 
-        // Copied straight into files/photos/, keeping its image type
+        // The server refuses HEIC, so the picture is re-encoded as a JPEG in files/photos/
         val file = File(path)
+        verifySequence { transcoder.transcodeToJpeg(SOURCE_URI, file) }
+
         Truth.assertThat(file.parentFile).isEqualTo(photosDirectory)
-        Truth.assertThat(file.extension).isEqualTo("png")
-        Truth.assertThat(file.readBytes()).isEqualTo(CONTENT)
+        Truth.assertThat(file.extension).isEqualTo("jpg")
+        Truth.assertThat(file.readBytes()).isEqualTo(JPEG_CONTENT)
     }
 
     @Test
-    fun testImportPhoto_UnknownType() {
-        every { contentResolver.getType(uri) } returns null
-        every { contentResolver.openInputStream(uri) } returns CONTENT.inputStream()
+    fun testImportPhoto_TooShortToRecognise() {
+        val content = byteArrayOf(0xFF.toByte(), 0xD8.toByte())
+
+        every { contentResolver.openInputStream(uri) } returns content.inputStream()
+        justRun { transcoder.transcodeToJpeg(SOURCE_URI, any()) }
 
         val path = dataSource.importPhoto(SOURCE_URI)
 
-        Truth.assertThat(File(path).extension).isEqualTo("jpg")
+        // Nothing it could be recognised as, so it is left to the decoder
+        verifySequence { transcoder.transcodeToJpeg(SOURCE_URI, File(path)) }
     }
 
     @Test
-    fun testImportPhoto_Unreadable() {
-        every { contentResolver.getType(uri) } returns "image/jpeg"
-        every { contentResolver.openInputStream(uri) } returns null
-
-        Assert.assertThrows(FileNotFoundException::class.java) { dataSource.importPhoto(SOURCE_URI) }
-
-        Truth.assertThat(photosDirectory.listFiles()).isEmpty()
-    }
-
-    @Test
-    fun testImportPhoto_ReadFails() {
-        val failingStream = object : InputStream() {
-            override fun read(): Int = throw IOException()
+    fun testImportPhoto_TranscodingFails() {
+        every { contentResolver.openInputStream(uri) } returns HEIC_CONTENT.inputStream()
+        every { transcoder.transcodeToJpeg(SOURCE_URI, any()) } answers {
+            secondArg<File>().writeBytes(byteArrayOf(1))
+            throw IOException()
         }
-
-        every { contentResolver.getType(uri) } returns "image/jpeg"
-        every { contentResolver.openInputStream(uri) } returns failingStream
 
         Assert.assertThrows(IOException::class.java) { dataSource.importPhoto(SOURCE_URI) }
 
@@ -114,8 +127,31 @@ class PhotoLocalDataSourceTest {
     }
 
     @Test
+    fun testImportPhoto_Unreadable() {
+        every { contentResolver.openInputStream(uri) } returns null
+
+        Assert.assertThrows(FileNotFoundException::class.java) { dataSource.importPhoto(SOURCE_URI) }
+
+        Truth.assertThat(photosDirectory.listFiles().orEmpty()).isEmpty()
+    }
+
+    @Test
+    fun testImportPhoto_ReadFails() {
+        val failingStream = object : InputStream() {
+            override fun read(): Int = throw IOException()
+        }
+
+        every { contentResolver.openInputStream(uri) } returns failingStream
+
+        Assert.assertThrows(IOException::class.java) { dataSource.importPhoto(SOURCE_URI) }
+
+        // No partial copy is left behind
+        Truth.assertThat(photosDirectory.listFiles().orEmpty()).isEmpty()
+    }
+
+    @Test
     fun testDeletePhoto() {
-        val file = File(dataSource.createPhotoFile()).apply { writeBytes(CONTENT) }
+        val file = File(dataSource.createPhotoFile()).apply { writeBytes(JPEG_CONTENT) }
 
         dataSource.deletePhoto(file.path)
 
@@ -131,8 +167,25 @@ class PhotoLocalDataSourceTest {
         Truth.assertThat(file.exists()).isTrue()
     }
 
+    private fun verifyCopiedAsIs(content: ByteArray, expectedExtension: String) {
+        every { contentResolver.openInputStream(uri) } returns content.inputStream()
+
+        val path = dataSource.importPhoto(SOURCE_URI)
+
+        // Copied straight into files/photos/ in its own format, whatever type the provider claims
+        val file = File(path)
+        verify(exactly = 0) { transcoder.transcodeToJpeg(any(), any()) }
+
+        Truth.assertThat(file.parentFile).isEqualTo(photosDirectory)
+        Truth.assertThat(file.extension).isEqualTo(expectedExtension)
+        Truth.assertThat(file.readBytes()).isEqualTo(content)
+    }
+
     private companion object {
         const val SOURCE_URI = "content://media/picker/0/42"
-        val CONTENT = byteArrayOf(1, 2, 3, 4)
+        val JPEG_CONTENT = byteArrayOf(0xFF.toByte(), 0xD8.toByte(), 0xFF.toByte(), 0xE0.toByte(), 1, 2, 3)
+        val PNG_CONTENT = byteArrayOf(0x89.toByte(), 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 1, 2, 3, 4, 5)
+        val WEBP_CONTENT = "RIFF".toByteArray() + byteArrayOf(0, 0, 0, 0) + "WEBPVP8 ".toByteArray()
+        val HEIC_CONTENT = byteArrayOf(0, 0, 0, 0x18) + "ftypheic".toByteArray()
     }
 }
