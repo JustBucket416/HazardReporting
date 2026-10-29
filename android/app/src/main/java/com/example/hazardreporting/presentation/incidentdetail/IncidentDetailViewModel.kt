@@ -15,7 +15,6 @@ import com.example.hazardreporting.domain.model.SyncState
 import com.example.hazardreporting.presentation.common.BaseViewModel
 import com.example.hazardreporting.presentation.navigation.IncidentDetail
 import com.example.hazardreporting.utils.CoroutineDispatchers
-import com.example.hazardreporting.utils.Logger
 import javax.inject.Inject
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
@@ -39,7 +38,6 @@ import kotlinx.coroutines.plus
  * @property incidentInteractor used for observing the incident and downloading its details
  * @param catalogInteractor used for naming the incident's category, severity and site
  * @property dispatchers used for launching off the main thread
- * @param logger used for logging unexpected exceptions
  *
  * @author Roman Pliskin on 29.10.2026
  */
@@ -48,8 +46,7 @@ class IncidentDetailViewModel @Inject constructor(
     private val incidentInteractor: IncidentInteractor,
     catalogInteractor: CatalogInteractor,
     private val dispatchers: CoroutineDispatchers,
-    logger: Logger,
-) : BaseViewModel(logger) {
+) : BaseViewModel() {
 
     private val localId = savedStateHandle.toRoute<IncidentDetail>().localId
     private val loadStatus = MutableStateFlow(LoadStatus())

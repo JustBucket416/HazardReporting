@@ -1,9 +1,7 @@
 package com.example.hazardreporting.di
 
-import com.example.hazardreporting.utils.AndroidLogger
 import com.example.hazardreporting.utils.CoroutineDispatchers
 import com.example.hazardreporting.utils.Logger
-import dagger.Binds
 import dagger.Module
 import dagger.Provides
 import java.time.Clock
@@ -13,44 +11,32 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
 
 /**
- * Provides application-wide utilities: the [Logger], the [ApplicationScope] coroutine scope and the [Clock]
+ * Provides application-wide utilities: the [ApplicationScope] coroutine scope and the [Clock]
  *
  * @author Roman Pliskin on 29.10.2026
  */
 @Module
-interface AppModule {
+object AppModule {
+
+    private const val TAG = "ApplicationScope"
 
     /**
-     * Binds [AndroidLogger] as the app's [Logger]
+     * Provides the [ApplicationScope] coroutine scope. A failing child doesn't cancel its siblings,
+     * and an uncaught exception is logged instead of crashing the app
      */
-    @Binds
-    fun bindLogger(logger: AndroidLogger): Logger
-
-    /**
-     * Provides the bindings that need code
-     */
-    companion object {
-
-        private const val TAG = "ApplicationScope"
-
-        /**
-         * Provides the [ApplicationScope] coroutine scope. A failing child doesn't cancel its siblings,
-         * and an uncaught exception is logged instead of crashing the app
-         */
-        @Provides
-        @Singleton
-        @ApplicationScope
-        fun provideApplicationScope(dispatchers: CoroutineDispatchers, logger: Logger): CoroutineScope {
-            val exceptionHandler = CoroutineExceptionHandler { _, throwable ->
-                logger.error(TAG, "Uncaught exception in the application scope", throwable)
-            }
-            return CoroutineScope(SupervisorJob() + dispatchers.default + exceptionHandler)
+    @Provides
+    @Singleton
+    @ApplicationScope
+    fun provideApplicationScope(dispatchers: CoroutineDispatchers): CoroutineScope {
+        val exceptionHandler = CoroutineExceptionHandler { _, throwable ->
+            Logger.error(TAG, "Uncaught exception in the application scope", throwable)
         }
-
-        /**
-         * Provides the device's wall clock, e.g. for stamping a new report's createdAt
-         */
-        @Provides
-        fun provideClock(): Clock = Clock.systemUTC()
+        return CoroutineScope(SupervisorJob() + dispatchers.default + exceptionHandler)
     }
+
+    /**
+     * Provides the device's wall clock, e.g. for stamping a new report's createdAt
+     */
+    @Provides
+    fun provideClock(): Clock = Clock.systemUTC()
 }

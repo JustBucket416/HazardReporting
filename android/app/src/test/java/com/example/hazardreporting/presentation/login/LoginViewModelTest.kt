@@ -17,10 +17,13 @@ import io.mockk.coVerifySequence
 import io.mockk.every
 import io.mockk.justRun
 import io.mockk.mockk
+import io.mockk.mockkObject
+import io.mockk.unmockkObject
 import io.mockk.verifySequence
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
+import org.junit.After
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -38,17 +41,22 @@ class LoginViewModelTest {
     private val savedStateHandle = SavedStateHandle()
     private val loginInteractor = mockk<LoginInteractor>()
     private val dispatchers = mockk<CoroutineDispatchers>()
-    private val logger = mockk<Logger>()
 
     private lateinit var viewModel: LoginViewModel
 
     @Before
     fun setUp() {
+        mockkObject(Logger)
         every { dispatchers.default } returns rule.testDispatcher
 
-        viewModel = LoginViewModel(savedStateHandle, loginInteractor, dispatchers, logger)
+        viewModel = LoginViewModel(savedStateHandle, loginInteractor, dispatchers)
         viewModel.onEmailChange(EMAIL)
         viewModel.onPasswordChange(PASSWORD)
+    }
+
+    @After
+    fun tearDown() {
+        unmockkObject(Logger)
     }
 
     @Test
@@ -120,7 +128,7 @@ class LoginViewModelTest {
         val exception = IllegalStateException()
 
         coEvery { loginInteractor.login(EMAIL, PASSWORD) } throws exception
-        justRun { logger.error(any(), any(), exception) }
+        justRun { Logger.error(any(), any(), exception) }
 
         viewModel.events.test {
             viewModel.onSubmit()
@@ -129,7 +137,7 @@ class LoginViewModelTest {
             Truth.assertThat(awaitItem()).isEqualTo(LoginEvent.UnexpectedError)
         }
 
-        verifySequence { logger.error("LoginViewModel", any(), exception) }
+        verifySequence { Logger.error("LoginViewModel", any(), exception) }
 
         Truth.assertThat(viewModel.uiState.value).isEqualTo(
             LoginUiState(email = EMAIL, password = PASSWORD, isSigningIn = false, error = null)
@@ -199,7 +207,7 @@ class LoginViewModelTest {
     @Test
     fun testInit_RestoresEmail() {
         val restoredViewModel = LoginViewModel(
-            SavedStateHandle(mapOf(KEY_EMAIL to OTHER_EMAIL)), loginInteractor, dispatchers, logger
+            SavedStateHandle(mapOf(KEY_EMAIL to OTHER_EMAIL)), loginInteractor, dispatchers
         )
 
         Truth.assertThat(restoredViewModel.uiState.value).isEqualTo(LoginUiState(email = OTHER_EMAIL))

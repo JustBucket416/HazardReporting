@@ -24,6 +24,8 @@ import io.mockk.coVerifyOrder
 import io.mockk.every
 import io.mockk.justRun
 import io.mockk.mockk
+import io.mockk.mockkObject
+import io.mockk.unmockkObject
 import io.mockk.verify
 import java.io.File
 import java.time.Clock
@@ -36,6 +38,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
 import okhttp3.ResponseBody.Companion.toResponseBody
+import org.junit.After
 import org.junit.Before
 import org.junit.Test
 import retrofit2.HttpException
@@ -59,7 +62,6 @@ class IncidentSynchronizerTest {
     private val converter = IncidentConverter()
     private val syncLock = SyncLock()
     private val clock = Clock.fixed(Instant.ofEpochMilli(NOW), ZoneOffset.UTC)
-    private val logger = mockk<Logger>()
     private val dispatchers = mockk<CoroutineDispatchers>()
 
     /**
@@ -91,6 +93,7 @@ class IncidentSynchronizerTest {
 
     @Before
     fun setUp() {
+        mockkObject(Logger)
         every { dispatchers.io } returns UnconfinedTestDispatcher()
         stubLocalDataSource()
         stubServer()
@@ -99,7 +102,7 @@ class IncidentSynchronizerTest {
         }
         every { photoLocalDataSource.deletePhoto(any()) } answers { files -= firstArg<String>() }
         justRun { photoLocalDataSource.deleteUnreferencedPhotos(any(), any()) }
-        justRun { logger.error(any(), any(), any()) }
+        justRun { Logger.error(any(), any(), any()) }
 
         synchronizer = IncidentSynchronizer(
             localDataSource,
@@ -108,9 +111,13 @@ class IncidentSynchronizerTest {
             converter,
             syncLock,
             clock,
-            logger,
             dispatchers,
         )
+    }
+
+    @After
+    fun tearDown() {
+        unmockkObject(Logger)
     }
 
     @Test
@@ -589,7 +596,7 @@ class IncidentSynchronizerTest {
 
         // The refused report stays pending and is logged; the next one is still sent, and nothing is retried in a loop
         coVerify(exactly = 1) { remoteDataSource.createIncident(match { it.createdAt == report(1).createdAt }) }
-        verify(exactly = 1) { logger.error("IncidentSynchronizer", any(), ofType(HttpException::class)) }
+        verify(exactly = 1) { Logger.error("IncidentSynchronizer", any(), ofType(HttpException::class)) }
         Truth.assertThat(incidents.getValue(1).syncState).isEqualTo(SyncState.PendingCreate)
         Truth.assertThat(incidents.getValue(2).syncState).isEqualTo(SyncState.Synced)
     }
@@ -619,7 +626,7 @@ class IncidentSynchronizerTest {
 
         // A failing server may recover: the push stops for a retry with backoff instead of skipping the incident
         coVerify(exactly = 0) { remoteDataSource.createIncident(any()) }
-        verify(exactly = 0) { logger.error(any(), any(), any()) }
+        verify(exactly = 0) { Logger.error(any(), any(), any()) }
         Truth.assertThat(incidents.getValue(1).syncState).isEqualTo(SyncState.PendingUpdate)
         Truth.assertThat(incidents.getValue(2).syncState).isEqualTo(SyncState.PendingCreate)
     }
@@ -647,7 +654,7 @@ class IncidentSynchronizerTest {
 
         // It can never be uploaded, so nothing is sent for it; the technician can still edit the photo away
         coVerify(exactly = 0) { remoteDataSource.uploadPhoto(File(PATH_A), any()) }
-        verify(exactly = 1) { logger.error("IncidentSynchronizer", any(), null) }
+        verify(exactly = 1) { Logger.error("IncidentSynchronizer", any(), null) }
         Truth.assertThat(incidents.getValue(1).createAttempted).isFalse()
         Truth.assertThat(incidents.getValue(2).syncState).isEqualTo(SyncState.Synced)
     }
@@ -696,7 +703,7 @@ class IncidentSynchronizerTest {
         Truth.assertThat(incidents.values.mapNotNull { it.serverId }).containsExactly("inc-1")
         Truth.assertThat(incidents.getValue(1).serverId).isNull()
         Truth.assertThat(incidents.getValue(1).syncState).isEqualTo(SyncState.PendingCreate)
-        verify { logger.error("IncidentSynchronizer", match { it.contains("held by incident 9") }, null) }
+        verify { Logger.error("IncidentSynchronizer", match { it.contains("held by incident 9") }, null) }
     }
 
     @Test

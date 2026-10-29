@@ -12,7 +12,7 @@ Dispatchers come from an injected `CoroutineDispatchers` class, which tests mock
 - The data layer translates `IOException` and `HttpException` into domain exceptions, and lets everything else through.
 - The domain layer throws `ValidationException`.
 - ViewModels catch the domain exceptions they can show to the user.
-- Anything else reaches the shared `CoroutineExceptionHandler`. It logs through an injected `Logger` (so it works in JVM tests) and calls the ViewModel's `onUnexpected` to clear loading state.
+- Anything else reaches the shared `CoroutineExceptionHandler`. It logs through the `Logger` object (mocked with `mockkObject` in JVM tests) and calls the ViewModel's `onUnexpected` to clear loading state.
 
 `runCatching` is banned in coroutine code because it also swallows `CancellationException`.
 

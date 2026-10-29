@@ -7,7 +7,6 @@ import com.example.hazardreporting.presentation.navigation.Destination
 import com.example.hazardreporting.presentation.navigation.IncidentList
 import com.example.hazardreporting.presentation.navigation.Login
 import com.example.hazardreporting.utils.CoroutineDispatchers
-import com.example.hazardreporting.utils.Logger
 import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -20,15 +19,13 @@ import kotlinx.coroutines.launch
  *
  * @property loginInteractor used for finding out whether someone is signed in
  * @property dispatchers used for launching off the main thread
- * @param logger used for logging unexpected exceptions
  *
  * @author Roman Pliskin on 29.10.2026
  */
 class MainViewModel @Inject constructor(
     private val loginInteractor: LoginInteractor,
     private val dispatchers: CoroutineDispatchers,
-    logger: Logger,
-) : BaseViewModel(logger) {
+) : BaseViewModel() {
 
     private val _uiState = MutableStateFlow(MainUiState())
 

@@ -44,7 +44,6 @@ import retrofit2.HttpException
  * @property converter used for converting between entities and DTOs
  * @property syncLock keeps pushes, pulls and logout's wipe apart
  * @property clock used for telling old photo files from new ones
- * @property logger used for logging changes the server refuses
  * @property dispatchers used for running on the IO dispatcher
  *
  * @author Roman Pliskin on 29.10.2026
@@ -56,7 +55,6 @@ class IncidentSynchronizer @Inject constructor(
     private val converter: IncidentConverter,
     private val syncLock: SyncLock,
     private val clock: Clock,
-    private val logger: Logger,
     private val dispatchers: CoroutineDispatchers,
 ) {
 
@@ -119,7 +117,7 @@ class IncidentSynchronizer @Inject constructor(
             // A failing server may recover, so the push stops for a retry with backoff, as without a connection
             if (e.code() >= HTTP_SERVER_ERROR) throw NoConnectionException(e)
             // Sending it again won't help, so it stays pending without holding up the other incidents
-            logger.error(TAG, "The server refused the pending change of incident $localId (HTTP ${e.code()})", e)
+            Logger.error(TAG, "The server refused the pending change of incident $localId (HTTP ${e.code()})", e)
         }
     }
 
@@ -290,7 +288,7 @@ class IncidentSynchronizer @Inject constructor(
 
     // For a change that can never be sent as it is; it stays pending, so the technician can still edit it
     private fun logUnsendable(localId: Long, reason: String) {
-        logger.error(TAG, "Can't send the pending change of incident $localId: $reason")
+        Logger.error(TAG, "Can't send the pending change of incident $localId: $reason")
     }
 
     private fun CreateIncidentRequestDto.isSameReportAs(dto: IncidentDto): Boolean =

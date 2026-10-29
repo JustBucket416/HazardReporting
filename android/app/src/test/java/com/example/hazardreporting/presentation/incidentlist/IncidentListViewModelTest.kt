@@ -27,7 +27,9 @@ import io.mockk.coVerifyOrder
 import io.mockk.every
 import io.mockk.justRun
 import io.mockk.mockk
+import io.mockk.mockkObject
 import io.mockk.mockkStatic
+import io.mockk.unmockkObject
 import io.mockk.unmockkStatic
 import io.mockk.verifySequence
 import kotlinx.coroutines.CompletableDeferred
@@ -58,12 +60,12 @@ class IncidentListViewModelTest {
     private val catalogInteractor = mockk<CatalogInteractor>()
     private val loginInteractor = mockk<LoginInteractor>()
     private val dispatchers = mockk<CoroutineDispatchers>()
-    private val logger = mockk<Logger>()
     private val incidents = MutableStateFlow<List<IncidentSummary>>(emptyList())
     private val isSessionInvalid = MutableStateFlow(false)
 
     @Before
     fun setUp() {
+        mockkObject(Logger)
         mockkStatic(SAVED_STATE_HANDLE_KT)
         every { dispatchers.default } returns rule.testDispatcher
         every { incidentInteractor.observeMyIncidents() } returns incidents
@@ -75,6 +77,7 @@ class IncidentListViewModelTest {
 
     @After
     fun tearDown() {
+        unmockkObject(Logger)
         unmockkStatic(SAVED_STATE_HANDLE_KT)
     }
 
@@ -336,7 +339,7 @@ class IncidentListViewModelTest {
         val exception = IllegalStateException()
 
         coEvery { incidentInteractor.refreshIncidents() } throws exception
-        justRun { logger.error(any(), any(), exception) }
+        justRun { Logger.error(any(), any(), exception) }
         incidents.value = listOf(SUMMARY)
 
         val viewModel = createViewModel(refreshOnOpen = false)
@@ -349,7 +352,7 @@ class IncidentListViewModelTest {
             Truth.assertThat(awaitItem()).isEqualTo(IncidentListEvent.UnexpectedError)
         }
 
-        verifySequence { logger.error("IncidentListViewModel", any(), exception) }
+        verifySequence { Logger.error("IncidentListViewModel", any(), exception) }
 
         // The pull indicator stops
         Truth.assertThat(viewModel.uiState.value).isEqualTo(
@@ -509,7 +512,7 @@ class IncidentListViewModelTest {
 
         coEvery { loginInteractor.countPendingChanges() } returns 0
         coEvery { loginInteractor.logout(force = false) } throws exception
-        justRun { logger.error(any(), any(), exception) }
+        justRun { Logger.error(any(), any(), exception) }
 
         val viewModel = createViewModel(refreshOnOpen = false)
         collectUiState(viewModel)
@@ -542,7 +545,6 @@ class IncidentListViewModelTest {
             catalogInteractor,
             loginInteractor,
             dispatchers,
-            logger,
         )
     }
 

@@ -17,7 +17,6 @@ import com.example.hazardreporting.domain.model.SyncState
 import com.example.hazardreporting.presentation.common.BaseViewModel
 import com.example.hazardreporting.presentation.navigation.IncidentList
 import com.example.hazardreporting.utils.CoroutineDispatchers
-import com.example.hazardreporting.utils.Logger
 import javax.inject.Inject
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
@@ -44,7 +43,6 @@ import kotlinx.coroutines.plus
  * @param catalogInteractor used for naming each incident's category, severity and site
  * @property loginInteractor used for observing whether the session is still valid, and for signing out
  * @property dispatchers used for launching off the main thread
- * @param logger used for logging unexpected exceptions
  *
  * @author Roman Pliskin on 29.10.2026
  */
@@ -54,8 +52,7 @@ class IncidentListViewModel @Inject constructor(
     catalogInteractor: CatalogInteractor,
     private val loginInteractor: LoginInteractor,
     private val dispatchers: CoroutineDispatchers,
-    logger: Logger,
-) : BaseViewModel(logger) {
+) : BaseViewModel() {
 
     private val refreshStatus = MutableStateFlow(RefreshStatus())
     private val logoutDialog = MutableStateFlow<LogoutDialog?>(null)

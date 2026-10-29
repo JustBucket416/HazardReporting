@@ -8,19 +8,15 @@ import kotlinx.coroutines.CoroutineExceptionHandler
  * Base class of the app's ViewModels. It owns the shared [exceptionHandler], so every ViewModel
  * launches with `viewModelScope.launch(exceptionHandler + dispatchers.default)` (ADR-0009)
  *
- * @property logger used for logging exceptions nobody expected
- *
  * @author Roman Pliskin on 29.10.2026
  */
-abstract class BaseViewModel(
-    private val logger: Logger,
-) : ViewModel() {
+abstract class BaseViewModel : ViewModel() {
 
     /**
      * Handles exceptions the ViewModel doesn't catch itself: logs them and then calls [onUnexpected]
      */
     protected val exceptionHandler = CoroutineExceptionHandler { _, throwable ->
-        logger.error(javaClass.simpleName, UNEXPECTED_EXCEPTION_MESSAGE, throwable)
+        Logger.error(javaClass.simpleName, UNEXPECTED_EXCEPTION_MESSAGE, throwable)
         onUnexpected(throwable)
     }
 

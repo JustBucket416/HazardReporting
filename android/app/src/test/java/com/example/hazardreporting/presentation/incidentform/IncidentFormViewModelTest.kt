@@ -24,8 +24,10 @@ import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.justRun
 import io.mockk.mockk
+import io.mockk.mockkObject
 import io.mockk.mockkStatic
 import io.mockk.slot
+import io.mockk.unmockkObject
 import io.mockk.unmockkStatic
 import io.mockk.verifySequence
 import kotlinx.coroutines.CompletableDeferred
@@ -55,10 +57,10 @@ class IncidentFormViewModelTest {
     private val incidentInteractor = mockk<IncidentInteractor>()
     private val catalogInteractor = mockk<CatalogInteractor>()
     private val dispatchers = mockk<CoroutineDispatchers>()
-    private val logger = mockk<Logger>()
 
     @Before
     fun setUp() {
+        mockkObject(Logger)
         mockkStatic(SAVED_STATE_HANDLE_KT)
         every { dispatchers.default } returns rule.testDispatcher
         every { catalogInteractor.observeCategories() } returns flowOf(listOf(CATEGORY))
@@ -70,6 +72,7 @@ class IncidentFormViewModelTest {
 
     @After
     fun tearDown() {
+        unmockkObject(Logger)
         unmockkStatic(SAVED_STATE_HANDLE_KT)
     }
 
@@ -734,7 +737,7 @@ class IncidentFormViewModelTest {
         val exception = IllegalStateException()
 
         coEvery { incidentInteractor.createPhotoFile() } throws exception
-        justRun { logger.error(any(), any(), exception) }
+        justRun { Logger.error(any(), any(), exception) }
 
         val viewModel = createViewModel()
         viewModel.events.test {
@@ -746,12 +749,12 @@ class IncidentFormViewModelTest {
             Truth.assertThat(awaitItem()).isEqualTo(IncidentFormEvent.UnexpectedError)
         }
 
-        verifySequence { logger.error("IncidentFormViewModel", any(), exception) }
+        verifySequence { Logger.error("IncidentFormViewModel", any(), exception) }
     }
 
     private fun createViewModel(localId: Long? = null): IncidentFormViewModel {
         every { savedStateHandle.toRoute(IncidentForm::class, any()) } returns IncidentForm(localId)
-        return IncidentFormViewModel(savedStateHandle, incidentInteractor, catalogInteractor, dispatchers, logger)
+        return IncidentFormViewModel(savedStateHandle, incidentInteractor, catalogInteractor, dispatchers)
     }
 
     /**

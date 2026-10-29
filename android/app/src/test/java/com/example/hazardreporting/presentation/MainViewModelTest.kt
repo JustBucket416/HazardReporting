@@ -14,10 +14,13 @@ import io.mockk.coVerifySequence
 import io.mockk.every
 import io.mockk.justRun
 import io.mockk.mockk
+import io.mockk.mockkObject
+import io.mockk.unmockkObject
 import io.mockk.verifySequence
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
+import org.junit.After
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -34,18 +37,23 @@ class MainViewModelTest {
 
     private val loginInteractor = mockk<LoginInteractor>()
     private val dispatchers = mockk<CoroutineDispatchers>()
-    private val logger = mockk<Logger>()
 
     @Before
     fun setUp() {
+        mockkObject(Logger)
         every { dispatchers.default } returns rule.testDispatcher
+    }
+
+    @After
+    fun tearDown() {
+        unmockkObject(Logger)
     }
 
     @Test
     fun testInit_SignedIn() = runTest {
         coEvery { loginInteractor.currentUser() } returns USER
 
-        val viewModel = MainViewModel(loginInteractor, dispatchers, logger)
+        val viewModel = MainViewModel(loginInteractor, dispatchers)
 
         // The splash screen stays up until the start screen is known
         Truth.assertThat(viewModel.uiState.value.startDestination).isNull()
@@ -61,7 +69,7 @@ class MainViewModelTest {
     fun testInit_SignedOut() = runTest {
         coEvery { loginInteractor.currentUser() } returns null
 
-        val viewModel = MainViewModel(loginInteractor, dispatchers, logger)
+        val viewModel = MainViewModel(loginInteractor, dispatchers)
         advanceUntilIdle()
 
         coVerifySequence { loginInteractor.currentUser() }
@@ -74,12 +82,12 @@ class MainViewModelTest {
         val exception = IllegalStateException()
 
         coEvery { loginInteractor.currentUser() } throws exception
-        justRun { logger.error(any(), any(), exception) }
+        justRun { Logger.error(any(), any(), exception) }
 
-        val viewModel = MainViewModel(loginInteractor, dispatchers, logger)
+        val viewModel = MainViewModel(loginInteractor, dispatchers)
         advanceUntilIdle()
 
-        verifySequence { logger.error("MainViewModel", any(), exception) }
+        verifySequence { Logger.error("MainViewModel", any(), exception) }
 
         Truth.assertThat(viewModel.uiState.value.startDestination).isEqualTo(Login)
     }

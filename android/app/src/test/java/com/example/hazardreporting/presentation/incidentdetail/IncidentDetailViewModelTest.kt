@@ -29,7 +29,9 @@ import io.mockk.coVerifyOrder
 import io.mockk.every
 import io.mockk.justRun
 import io.mockk.mockk
+import io.mockk.mockkObject
 import io.mockk.mockkStatic
+import io.mockk.unmockkObject
 import io.mockk.unmockkStatic
 import io.mockk.verifySequence
 import kotlinx.coroutines.CompletableDeferred
@@ -60,11 +62,11 @@ class IncidentDetailViewModelTest {
     private val incidentInteractor = mockk<IncidentInteractor>()
     private val catalogInteractor = mockk<CatalogInteractor>()
     private val dispatchers = mockk<CoroutineDispatchers>()
-    private val logger = mockk<Logger>()
     private val incident = MutableStateFlow(Incident(SUMMARY, details = null))
 
     @Before
     fun setUp() {
+        mockkObject(Logger)
         mockkStatic(SAVED_STATE_HANDLE_KT)
         every { savedStateHandle.toRoute(IncidentDetail::class, any()) } returns IncidentDetail(LOCAL_ID)
         every { dispatchers.default } returns rule.testDispatcher
@@ -76,6 +78,7 @@ class IncidentDetailViewModelTest {
 
     @After
     fun tearDown() {
+        unmockkObject(Logger)
         unmockkStatic(SAVED_STATE_HANDLE_KT)
     }
 
@@ -359,7 +362,7 @@ class IncidentDetailViewModelTest {
 
         coJustRun { incidentInteractor.loadIncidentDetails(LOCAL_ID, force = false) }
         coEvery { incidentInteractor.withdraw(LOCAL_ID) } throws exception
-        justRun { logger.error(any(), any(), exception) }
+        justRun { Logger.error(any(), any(), exception) }
 
         val viewModel = createViewModel()
         advanceUntilIdle()
@@ -378,7 +381,7 @@ class IncidentDetailViewModelTest {
         val exception = IllegalStateException()
 
         coEvery { incidentInteractor.loadIncidentDetails(LOCAL_ID, force = false) } throws exception
-        justRun { logger.error(any(), any(), exception) }
+        justRun { Logger.error(any(), any(), exception) }
 
         val viewModel = createViewModel()
         collectUiState(viewModel)
@@ -389,7 +392,7 @@ class IncidentDetailViewModelTest {
             Truth.assertThat(awaitItem()).isEqualTo(IncidentDetailEvent.UnexpectedError)
         }
 
-        verifySequence { logger.error("IncidentDetailViewModel", any(), exception) }
+        verifySequence { Logger.error("IncidentDetailViewModel", any(), exception) }
 
         // Loading stops and Retry is offered
         Truth.assertThat(viewModel.uiState.value).isEqualTo(
@@ -398,7 +401,7 @@ class IncidentDetailViewModelTest {
     }
 
     private fun createViewModel() =
-        IncidentDetailViewModel(savedStateHandle, incidentInteractor, catalogInteractor, dispatchers, logger)
+        IncidentDetailViewModel(savedStateHandle, incidentInteractor, catalogInteractor, dispatchers)
 
     /**
      * Subscribes to the state the way the screen does, so the ViewModel's flows run

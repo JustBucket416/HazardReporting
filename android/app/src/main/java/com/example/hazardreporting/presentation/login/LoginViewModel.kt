@@ -8,7 +8,6 @@ import com.example.hazardreporting.domain.exception.NotTechnicianException
 import com.example.hazardreporting.domain.interactor.LoginInteractor
 import com.example.hazardreporting.presentation.common.BaseViewModel
 import com.example.hazardreporting.utils.CoroutineDispatchers
-import com.example.hazardreporting.utils.Logger
 import javax.inject.Inject
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
@@ -27,7 +26,6 @@ import kotlinx.coroutines.launch
  * @property savedStateHandle keeps the typed email
  * @property loginInteractor used for signing in
  * @property dispatchers used for launching off the main thread
- * @param logger used for logging unexpected exceptions
  *
  * @author Roman Pliskin on 29.10.2026
  */
@@ -35,8 +33,7 @@ class LoginViewModel @Inject constructor(
     private val savedStateHandle: SavedStateHandle,
     private val loginInteractor: LoginInteractor,
     private val dispatchers: CoroutineDispatchers,
-    logger: Logger,
-) : BaseViewModel(logger) {
+) : BaseViewModel() {
 
     private val _uiState = MutableStateFlow(LoginUiState(email = savedStateHandle[KEY_EMAIL] ?: ""))
     private val _events = Channel<LoginEvent>(Channel.BUFFERED)

@@ -14,7 +14,6 @@ import com.example.hazardreporting.domain.model.Site
 import com.example.hazardreporting.presentation.common.BaseViewModel
 import com.example.hazardreporting.presentation.navigation.IncidentForm
 import com.example.hazardreporting.utils.CoroutineDispatchers
-import com.example.hazardreporting.utils.Logger
 import javax.inject.Inject
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
@@ -48,7 +47,6 @@ import kotlinx.coroutines.plus
  * photo files
  * @param catalogInteractor used for the categories, severities and sites to choose from
  * @property dispatchers used for launching off the main thread
- * @param logger used for logging unexpected exceptions
  *
  * @author Roman Pliskin on 29.10.2026
  */
@@ -57,8 +55,7 @@ class IncidentFormViewModel @Inject constructor(
     private val incidentInteractor: IncidentInteractor,
     catalogInteractor: CatalogInteractor,
     private val dispatchers: CoroutineDispatchers,
-    logger: Logger,
-) : BaseViewModel(logger) {
+) : BaseViewModel() {
 
     private val editedLocalId = savedStateHandle.toRoute<IncidentForm>().localId
     private val isEditing = editedLocalId != null
