@@ -3,7 +3,6 @@ package com.example.hazardreporting.presentation.navigation
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -11,10 +10,8 @@ import androidx.navigation.NavController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
-import androidx.navigation.toRoute
-import com.example.hazardreporting.R
-import com.example.hazardreporting.presentation.common.PlaceholderScreen
 import com.example.hazardreporting.presentation.incidentdetail.IncidentDetailRoute
+import com.example.hazardreporting.presentation.incidentform.IncidentFormRoute
 import com.example.hazardreporting.presentation.incidentlist.IncidentListRoute
 import com.example.hazardreporting.presentation.login.LoginRoute
 
@@ -64,10 +61,15 @@ fun HazardReportingNavHost(
                 onBack = { navController.popBackStack() },
             )
         }
-        composable<IncidentForm> { backStackEntry ->
-            val isEditing = backStackEntry.toRoute<IncidentForm>().localId != null
-            val title = if (isEditing) R.string.incident_form_edit_title else R.string.incident_form_new_title
-            PlaceholderScreen(title = stringResource(title))
+        composable<IncidentForm> {
+            IncidentFormRoute(
+                viewModel = viewModel(factory = viewModelFactory),
+                onClose = { navController.popBackStack() },
+                onSaved = {
+                    navController.previousBackStackEntry?.savedStateHandle?.set(REPORT_SAVED_RESULT, true)
+                    navController.popBackStack()
+                },
+            )
         }
     }
 }

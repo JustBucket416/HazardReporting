@@ -2,10 +2,13 @@ package com.example.hazardreporting.data.incident
 
 import com.example.hazardreporting.data.incident.entity.IncidentEntity
 import com.example.hazardreporting.domain.model.Incident
+import com.example.hazardreporting.domain.model.IncidentDraft
 import com.example.hazardreporting.domain.model.IncidentSummary
+import com.example.hazardreporting.domain.model.Photo
 import com.example.hazardreporting.domain.model.SyncState
 import com.example.hazardreporting.domain.repository.IncidentRepository
 import com.example.hazardreporting.utils.CoroutineDispatchers
+import java.time.Clock
 import javax.inject.Inject
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.filterNotNull
@@ -18,7 +21,9 @@ import kotlinx.coroutines.withContext
  *
  * @property remoteDataSource used for calling the server's incident routes
  * @property localDataSource used for storing the incidents
+ * @property photoLocalDataSource used for storing photo files
  * @property converter used for converting between DTOs, entities and domain models
+ * @property clock used for stamping a new report's createdAt
  * @property dispatchers used for running on the IO dispatcher
  *
  * @author Roman Pliskin on 29.10.2026
@@ -26,7 +31,9 @@ import kotlinx.coroutines.withContext
 class IncidentRepositoryImpl @Inject constructor(
     private val remoteDataSource: IncidentRemoteDataSource,
     private val localDataSource: IncidentLocalDataSource,
+    private val photoLocalDataSource: PhotoLocalDataSource,
     private val converter: IncidentConverter,
+    private val clock: Clock,
     private val dispatchers: CoroutineDispatchers,
 ) : IncidentRepository {
 
@@ -93,5 +100,27 @@ class IncidentRepositoryImpl @Inject constructor(
                 }
             }
         }
+    }
+
+    override suspend fun report(draft: IncidentDraft): Long = withContext(dispatchers.io) {
+        // The device's clock at first save; it never changes and is how the server deduplicates (ADR-0003)
+        val createdAt = clock.millis()
+        localDataSource.inTransaction {
+            val localId = localDataSource.insertIncident(converter.convertNew(draft, createdAt))
+            localDataSource.insertPhotos(converter.convertPhotos(localId, draft.photos))
+            localId
+        }
+    }
+
+    override suspend fun createPhotoFile(): Photo.Local = withContext(dispatchers.io) {
+        Photo.Local(photoLocalDataSource.createPhotoFile())
+    }
+
+    override suspend fun importPhoto(sourceUri: String): Photo.Local = withContext(dispatchers.io) {
+        Photo.Local(photoLocalDataSource.importPhoto(sourceUri))
+    }
+
+    override suspend fun deletePhoto(photo: Photo.Local) {
+        withContext(dispatchers.io) { photoLocalDataSource.deletePhoto(photo.path) }
     }
 }

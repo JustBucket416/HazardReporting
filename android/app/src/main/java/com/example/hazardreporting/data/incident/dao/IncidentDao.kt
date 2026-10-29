@@ -43,6 +43,12 @@ interface IncidentDao {
     suspend fun getByLocalId(localId: Long): IncidentEntity?
 
     /**
+     * Inserts [incident] and returns its generated local id
+     */
+    @Insert
+    suspend fun insert(incident: IncidentEntity): Long
+
+    /**
      * Inserts [incidents]
      */
     @Insert

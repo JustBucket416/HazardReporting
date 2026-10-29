@@ -8,6 +8,7 @@ import com.example.hazardreporting.data.incident.entity.IncidentPhotoEntity
 import com.example.hazardreporting.data.incident.entity.IncidentWithPhotos
 import com.example.hazardreporting.domain.model.Incident
 import com.example.hazardreporting.domain.model.IncidentDetails
+import com.example.hazardreporting.domain.model.IncidentDraft
 import com.example.hazardreporting.domain.model.IncidentStatus
 import com.example.hazardreporting.domain.model.IncidentSummary
 import com.example.hazardreporting.domain.model.Photo
@@ -283,8 +284,95 @@ class IncidentConverterTest {
         Truth.assertThat(photo).isNull()
     }
 
-    private fun photoRow(localPath: String?, remoteUrl: String?) =
-        IncidentPhotoEntity(id = 1, incidentLocalId = LOCAL_ID, position = 0, localPath = localPath, remoteUrl = remoteUrl)
+    @Test
+    fun testConvertNew() {
+        val draft = IncidentDraft(
+            title = "Leaking valve",
+            description = "Dripping steadily",
+            categoryId = "cat-plumbing",
+            severityId = "sev-medium",
+            siteId = "site-depot",
+            locationDescription = "Pump room B2",
+            position = Position(53.5, -2.2, 12.0),
+            photos = listOf(Photo.Local("/files/photos/a.jpg")),
+        )
+
+        val entity = converter.convertNew(draft, createdAt = CREATED_AT)
+
+        Truth.assertThat(entity).isEqualTo(
+            IncidentEntity(
+                localId = 0,
+                serverId = null,
+                title = "Leaking valve",
+                categoryId = "cat-plumbing",
+                severityId = "sev-medium",
+                siteId = "site-depot",
+                status = "open",
+                createdAt = CREATED_AT,
+                updatedAt = null,
+                description = "Dripping steadily",
+                locationDescription = "Pump room B2",
+                positionLat = 53.5,
+                positionLng = -2.2,
+                positionAccuracyM = 12.0,
+                priority = null,
+                // Every detail of a new report is on the device
+                detailsLoaded = true,
+                syncState = SyncState.PendingCreate,
+                localVersion = 0,
+                createAttempted = false,
+                statusChangeNoticePending = false,
+            )
+        )
+    }
+
+    @Test
+    fun testConvertNew_WithoutPosition() {
+        val draft = IncidentDraft("Title", "", "cat", "sev", "site", "", position = null, photos = emptyList())
+
+        val entity = converter.convertNew(draft, createdAt = CREATED_AT)
+
+        Truth.assertThat(entity.positionLat).isNull()
+        Truth.assertThat(entity.positionLng).isNull()
+        Truth.assertThat(entity.positionAccuracyM).isNull()
+    }
+
+    @Test
+    fun testConvertDraftPhotos() {
+        val photos = converter.convertPhotos(
+            LOCAL_ID,
+            listOf(
+                Photo.Local("/files/photos/a.jpg"),
+                Photo.Remote("http://10.0.2.2:3001/uploads/b.png"),
+                Photo.Remote("https://cdn.example.com/c.jpg"),
+            ),
+        )
+
+        // A server photo is stored relative again, as the server sent it; any other URL stays as it is
+        Truth.assertThat(photos).containsExactly(
+            IncidentPhotoEntity(
+                incidentLocalId = LOCAL_ID,
+                position = 0,
+                localPath = "/files/photos/a.jpg",
+                remoteUrl = null,
+            ),
+            IncidentPhotoEntity(incidentLocalId = LOCAL_ID, position = 1, localPath = null, remoteUrl = REMOTE_B),
+            IncidentPhotoEntity(
+                incidentLocalId = LOCAL_ID,
+                position = 2,
+                localPath = null,
+                remoteUrl = "https://cdn.example.com/c.jpg",
+            ),
+        ).inOrder()
+    }
+
+    private fun photoRow(localPath: String?, remoteUrl: String?) = IncidentPhotoEntity(
+        id = 1,
+        incidentLocalId = LOCAL_ID,
+        position = 0,
+        localPath = localPath,
+        remoteUrl = remoteUrl,
+    )
 
     private companion object {
         const val BASE_URL = "http://10.0.2.2:3001/"

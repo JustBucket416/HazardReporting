@@ -22,6 +22,7 @@ import kotlinx.coroutines.CoroutineScope
         DataStoreModule::class,
         ImageLoaderModule::class,
         InteractorModule::class,
+        LocationModule::class,
         NetworkModule::class,
         RepositoryModule::class,
         ViewModelFactoryModule::class,

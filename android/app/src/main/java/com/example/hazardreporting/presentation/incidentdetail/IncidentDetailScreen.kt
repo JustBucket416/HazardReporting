@@ -60,8 +60,8 @@ import com.example.hazardreporting.presentation.common.SeverityChip
 import com.example.hazardreporting.presentation.common.ShimmerPlaceholder
 import com.example.hazardreporting.presentation.common.StatusChip
 import com.example.hazardreporting.presentation.common.formatLocalDateTime
+import com.example.hazardreporting.presentation.common.label
 import com.example.hazardreporting.presentation.theme.HazardReportingTheme
-import kotlin.math.roundToInt
 import kotlinx.coroutines.launch
 
 /**
@@ -347,10 +347,6 @@ private fun Priority.label(): String = stringResource(
         Priority.Unknown -> R.string.incident_priority_unknown
     }
 )
-
-@Composable
-private fun Position.label(): String =
-    stringResource(R.string.incident_position_value, accuracyM.roundToInt(), lat, lng)
 
 private const val PHOTO_ASPECT_RATIO = 4f / 3f
 private val PAGE_INDICATOR_SIZE = 8.dp

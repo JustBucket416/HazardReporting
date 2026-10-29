@@ -62,6 +62,28 @@ class IncidentLocalDataSourceTest {
     }
 
     @Test
+    fun testInsertIncident() = runTest {
+        val incident = mockk<IncidentEntity>()
+
+        coEvery { incidentDao.insert(incident) } returns 9L
+
+        Truth.assertThat(dataSource.insertIncident(incident)).isEqualTo(9L)
+
+        coVerifySequence { incidentDao.insert(incident) }
+    }
+
+    @Test
+    fun testInsertPhotos() = runTest {
+        val photos = listOf(mockk<IncidentPhotoEntity>())
+
+        coJustRun { photoDao.insertAll(photos) }
+
+        dataSource.insertPhotos(photos)
+
+        coVerifySequence { photoDao.insertAll(photos) }
+    }
+
+    @Test
     fun testReplacePhotos() = runTest {
         val photos = listOf(mockk<IncidentPhotoEntity>())
 

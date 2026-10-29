@@ -1,7 +1,9 @@
 package com.example.hazardreporting.domain.repository
 
 import com.example.hazardreporting.domain.model.Incident
+import com.example.hazardreporting.domain.model.IncidentDraft
 import com.example.hazardreporting.domain.model.IncidentSummary
+import com.example.hazardreporting.domain.model.Photo
 import kotlinx.coroutines.flow.Flow
 
 /**
@@ -42,4 +44,29 @@ interface IncidentRepository {
      * @throws com.example.hazardreporting.domain.exception.UnauthorizedException if the server rejects the session
      */
     suspend fun loadDetails(localId: Long, force: Boolean)
+
+    /**
+     * Stores a new incident from the valid [draft] as a pending report, with its createdAt set to now
+     *
+     * @return the new incident's local id
+     */
+    suspend fun report(draft: IncidentDraft): Long
+
+    /**
+     * Creates a path for a new photo in the app's private photo storage, for the camera to write to.
+     * The file itself is created by whoever writes it
+     */
+    suspend fun createPhotoFile(): Photo.Local
+
+    /**
+     * Copies the picture at [sourceUri], e.g. one picked from the gallery, into the app's private photo storage
+     *
+     * @return the copy
+     */
+    suspend fun importPhoto(sourceUri: String): Photo.Local
+
+    /**
+     * Deletes the file of [photo] from the app's private photo storage. A file outside it is left alone
+     */
+    suspend fun deletePhoto(photo: Photo.Local)
 }

@@ -8,7 +8,9 @@ import com.example.hazardreporting.data.incident.entity.IncidentPhotoEntity
 import com.example.hazardreporting.data.incident.entity.IncidentWithPhotos
 import com.example.hazardreporting.domain.exception.NoConnectionException
 import com.example.hazardreporting.domain.model.Incident
+import com.example.hazardreporting.domain.model.IncidentDraft
 import com.example.hazardreporting.domain.model.IncidentSummary
+import com.example.hazardreporting.domain.model.Photo
 import com.example.hazardreporting.domain.model.SyncState
 import com.example.hazardreporting.utils.CoroutineDispatchers
 import com.google.common.truth.Truth
@@ -16,8 +18,12 @@ import io.mockk.coEvery
 import io.mockk.coJustRun
 import io.mockk.coVerifySequence
 import io.mockk.every
+import io.mockk.justRun
 import io.mockk.mockk
 import io.mockk.verifySequence
+import java.time.Clock
+import java.time.Instant
+import java.time.ZoneOffset
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
@@ -34,7 +40,9 @@ class IncidentRepositoryImplTest {
 
     private val remoteDataSource = mockk<IncidentRemoteDataSource>()
     private val localDataSource = mockk<IncidentLocalDataSource>()
+    private val photoLocalDataSource = mockk<PhotoLocalDataSource>()
     private val converter = mockk<IncidentConverter>()
+    private val clock = Clock.fixed(Instant.ofEpochMilli(NOW), ZoneOffset.UTC)
     private val dispatchers = mockk<CoroutineDispatchers>()
 
     private lateinit var repository: IncidentRepositoryImpl
@@ -46,7 +54,14 @@ class IncidentRepositoryImplTest {
             firstArg<suspend () -> Unit>().invoke()
         }
 
-        repository = IncidentRepositoryImpl(remoteDataSource, localDataSource, converter, dispatchers)
+        repository = IncidentRepositoryImpl(
+            remoteDataSource,
+            localDataSource,
+            photoLocalDataSource,
+            converter,
+            clock,
+            dispatchers,
+        )
     }
 
     @Test
@@ -324,6 +339,61 @@ class IncidentRepositoryImplTest {
         }
     }
 
+    @Test
+    fun testReport() = runTest {
+        val draft = mockk<IncidentDraft>()
+        val photos = listOf(Photo.Local("/files/photos/a.jpg"))
+        val entity = mockk<IncidentEntity>()
+        val photoEntities = listOf(mockk<IncidentPhotoEntity>())
+
+        coEvery { localDataSource.inTransaction<Long>(any()) } coAnswers { firstArg<suspend () -> Long>().invoke() }
+        every { draft.photos } returns photos
+        every { converter.convertNew(draft, NOW) } returns entity
+        coEvery { localDataSource.insertIncident(entity) } returns 9L
+        every { converter.convertPhotos(9L, photos) } returns photoEntities
+        coJustRun { localDataSource.insertPhotos(photoEntities) }
+
+        val localId = repository.report(draft)
+
+        // createdAt is the device's clock at first save; the row and its photos land in one transaction
+        coVerifySequence {
+            localDataSource.inTransaction<Long>(any())
+            converter.convertNew(draft, NOW)
+            localDataSource.insertIncident(entity)
+            converter.convertPhotos(9L, photos)
+            localDataSource.insertPhotos(photoEntities)
+        }
+
+        Truth.assertThat(localId).isEqualTo(9L)
+    }
+
+    @Test
+    fun testCreatePhotoFile() = runTest {
+        every { photoLocalDataSource.createPhotoFile() } returns "/files/photos/a.jpg"
+
+        Truth.assertThat(repository.createPhotoFile()).isEqualTo(Photo.Local("/files/photos/a.jpg"))
+
+        verifySequence { photoLocalDataSource.createPhotoFile() }
+    }
+
+    @Test
+    fun testImportPhoto() = runTest {
+        every { photoLocalDataSource.importPhoto("content://media/1") } returns "/files/photos/b.png"
+
+        Truth.assertThat(repository.importPhoto("content://media/1")).isEqualTo(Photo.Local("/files/photos/b.png"))
+
+        verifySequence { photoLocalDataSource.importPhoto("content://media/1") }
+    }
+
+    @Test
+    fun testDeletePhoto() = runTest {
+        justRun { photoLocalDataSource.deletePhoto("/files/photos/a.jpg") }
+
+        repository.deletePhoto(Photo.Local("/files/photos/a.jpg"))
+
+        verifySequence { photoLocalDataSource.deletePhoto("/files/photos/a.jpg") }
+    }
+
     private suspend fun verifyDownloadsDetails(stored: IncidentEntity, force: Boolean) {
         val dto = mockk<IncidentDto>()
         val updated = mockk<IncidentEntity>()
@@ -362,6 +432,7 @@ class IncidentRepositoryImplTest {
 
     private companion object {
         const val LOCAL_ID = 1L
+        const val NOW = 1_793_100_000_000L
         const val CREATED_AT = 1_793_015_100_000L
 
         val SUMMARY = IncidentSummaryDto(

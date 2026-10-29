@@ -8,6 +8,7 @@ import com.example.hazardreporting.data.incident.entity.IncidentWithPhotos
 import com.example.hazardreporting.data.remote.BaseUrl
 import com.example.hazardreporting.domain.model.Incident
 import com.example.hazardreporting.domain.model.IncidentDetails
+import com.example.hazardreporting.domain.model.IncidentDraft
 import com.example.hazardreporting.domain.model.IncidentStatus
 import com.example.hazardreporting.domain.model.IncidentSummary
 import com.example.hazardreporting.domain.model.Photo
@@ -16,6 +17,7 @@ import com.example.hazardreporting.domain.model.Priority
 import com.example.hazardreporting.domain.model.SyncState
 import javax.inject.Inject
 import okhttp3.HttpUrl
+import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 
 /**
  * Converts incidents from the server's DTOs to Room entities, and from entities to domain models.
@@ -126,6 +128,48 @@ class IncidentConverter @Inject constructor(
         }
 
     /**
+     * Converts a valid [draft] to the row of a new pending report created at [createdAt]. Its details are
+     * all on the device, so they count as downloaded
+     *
+     * @throws IllegalStateException if the draft has no category, severity or site, which validation rules out
+     */
+    fun convertNew(draft: IncidentDraft, createdAt: Long): IncidentEntity = IncidentEntity(
+        serverId = null,
+        title = draft.title,
+        categoryId = checkNotNull(draft.categoryId) { "A report needs a category" },
+        severityId = checkNotNull(draft.severityId) { "A report needs a severity" },
+        siteId = checkNotNull(draft.siteId) { "A report needs a site" },
+        status = STATUS_OPEN,
+        createdAt = createdAt,
+        updatedAt = null,
+        description = draft.description,
+        locationDescription = draft.locationDescription,
+        positionLat = draft.position?.lat,
+        positionLng = draft.position?.lng,
+        positionAccuracyM = draft.position?.accuracyM,
+        priority = null,
+        detailsLoaded = true,
+        syncState = SyncState.PendingCreate,
+        localVersion = 0,
+        createAttempted = false,
+        statusChangeNoticePending = false,
+    )
+
+    /**
+     * Converts a draft's [photos] to the photo rows of the incident with [incidentLocalId], keeping their order.
+     * A remote photo's URL is stored relative to the server again, as the server sent it
+     */
+    fun convertPhotos(incidentLocalId: Long, photos: List<Photo>): List<IncidentPhotoEntity> =
+        photos.mapIndexed { position, photo ->
+            IncidentPhotoEntity(
+                incidentLocalId = incidentLocalId,
+                position = position,
+                localPath = (photo as? Photo.Local)?.path,
+                remoteUrl = (photo as? Photo.Remote)?.url?.let { relativize(it) },
+            )
+        }
+
+    /**
      * Converts a stored incident to its domain [IncidentSummary]
      */
     fun convertSummary(entity: IncidentEntity): IncidentSummary = IncidentSummary(
@@ -179,6 +223,13 @@ class IncidentConverter @Inject constructor(
     }
 
     private fun resolve(url: String): String = baseUrl.resolve(url)?.toString() ?: url
+
+    private fun relativize(url: String): String {
+        val absolute = url.toHttpUrlOrNull() ?: return url
+        val isOnServer = absolute.scheme == baseUrl.scheme && absolute.host == baseUrl.host &&
+            absolute.port == baseUrl.port
+        return if (isOnServer) absolute.encodedPath else url
+    }
 
     private fun convertStatus(status: String): IncidentStatus = when (status) {
         STATUS_OPEN -> IncidentStatus.Open

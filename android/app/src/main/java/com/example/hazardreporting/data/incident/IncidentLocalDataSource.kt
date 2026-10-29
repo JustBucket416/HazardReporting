@@ -51,6 +51,11 @@ class IncidentLocalDataSource @Inject constructor(
     suspend fun getIncident(localId: Long): IncidentEntity? = incidentDao.getByLocalId(localId)
 
     /**
+     * Stores the new [incident] and returns its generated local id
+     */
+    suspend fun insertIncident(incident: IncidentEntity): Long = incidentDao.insert(incident)
+
+    /**
      * Stores the new [incidents]
      */
     suspend fun insertIncidents(incidents: List<IncidentEntity>) {
@@ -76,6 +81,13 @@ class IncidentLocalDataSource @Inject constructor(
      */
     suspend fun deleteIncidents(localIds: List<Long>) {
         incidentDao.deleteAll(localIds)
+    }
+
+    /**
+     * Stores the new [photos]
+     */
+    suspend fun insertPhotos(photos: List<IncidentPhotoEntity>) {
+        photoDao.insertAll(photos)
     }
 
     /**

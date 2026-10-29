@@ -5,7 +5,9 @@ import com.example.hazardreporting.domain.interactor.IncidentInteractor
 import com.example.hazardreporting.domain.interactor.LoginInteractor
 import com.example.hazardreporting.domain.repository.CatalogRepository
 import com.example.hazardreporting.domain.repository.IncidentRepository
+import com.example.hazardreporting.domain.repository.LocationProvider
 import com.example.hazardreporting.domain.repository.SessionRepository
+import com.example.hazardreporting.domain.repository.SyncScheduler
 import dagger.Module
 import dagger.Provides
 
@@ -39,5 +41,7 @@ object InteractorModule {
     fun provideIncidentInteractor(
         incidentRepository: IncidentRepository,
         catalogRepository: CatalogRepository,
-    ): IncidentInteractor = IncidentInteractor(incidentRepository, catalogRepository)
+        locationProvider: LocationProvider,
+        syncScheduler: SyncScheduler,
+    ): IncidentInteractor = IncidentInteractor(incidentRepository, catalogRepository, locationProvider, syncScheduler)
 }

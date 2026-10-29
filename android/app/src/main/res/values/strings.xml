@@ -3,11 +3,14 @@
 
     <!-- Shared -->
     <string name="error_unexpected">Something went wrong</string>
-    <string name="placeholder_coming_soon">Coming soon</string>
     <string name="action_retry">Retry</string>
     <string name="action_back">Back</string>
     <string name="action_more_options">More options</string>
+    <string name="action_close">Close</string>
+    <string name="action_save">Save</string>
     <string name="photo_load_failed">Couldn\'t load photo</string>
+    <!-- Accuracy in metres, then latitude and longitude, e.g. "±12 m · 53.50534, -2.20063" -->
+    <string name="position_value">±%1$d m · %2$.5f, %3$.5f</string>
     <!-- Stands in for a value that is unset or not known yet -->
     <string name="value_missing">—</string>
 
@@ -54,8 +57,6 @@
     <string name="incident_field_description">Description</string>
     <string name="incident_field_location_description">Location description</string>
     <string name="incident_field_position">Position</string>
-    <!-- Accuracy in metres, then latitude and longitude, e.g. "±12 m · 53.50534, -2.20063" -->
-    <string name="incident_position_value">±%1$d m · %2$.5f, %3$.5f</string>
     <string name="incident_priority_low">Low</string>
     <string name="incident_priority_medium">Medium</string>
     <string name="incident_priority_high">High</string>
@@ -63,4 +64,37 @@
     <string name="incident_priority_unknown">Unknown</string>
     <string name="incident_form_new_title">New report</string>
     <string name="incident_form_edit_title">Edit report</string>
+    <string name="incident_form_title">Title</string>
+    <string name="incident_form_description">Description</string>
+    <string name="incident_form_severity">Severity</string>
+    <string name="incident_form_add_photo">Add photo</string>
+    <!-- Content description of a photo's remove button, e.g. "Remove photo 2" -->
+    <string name="incident_form_remove_photo">Remove photo %1$d</string>
+    <string name="incident_form_camera">Camera</string>
+    <string name="incident_form_gallery">Gallery</string>
+    <string name="incident_form_no_camera">No camera app available</string>
+    <string name="incident_form_locating">Locating…</string>
+    <string name="incident_form_no_position">No position</string>
+    <string name="incident_form_recapture">Re-capture</string>
+    <!-- Characters used and allowed, e.g. "12 / 80" -->
+    <string name="incident_form_character_count">%1$d / %2$d</string>
+    <plurals name="incident_form_error_title">
+        <item quantity="one">Enter a title of up to %1$d character</item>
+        <item quantity="other">Enter a title of up to %1$d characters</item>
+    </plurals>
+    <plurals name="incident_form_error_description">
+        <item quantity="one">Use up to %1$d character</item>
+        <item quantity="other">Use up to %1$d characters</item>
+    </plurals>
+    <string name="incident_form_error_category">Choose a category</string>
+    <string name="incident_form_error_severity">Choose a severity</string>
+    <string name="incident_form_error_site">Choose a site</string>
+    <!-- Quantity is the maximum number of photos -->
+    <plurals name="incident_form_error_photos">
+        <item quantity="one">Add %1$d to %2$d photo</item>
+        <item quantity="other">Add %1$d to %2$d photos</item>
+    </plurals>
+    <string name="incident_form_discard_title">Discard changes?</string>
+    <string name="incident_form_discard">Discard</string>
+    <string name="incident_form_keep_editing">Keep editing</string>
 </resources>
