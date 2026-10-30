@@ -21,13 +21,18 @@ The domain language is in [GLOSSARY.md](GLOSSARY.md), the decisions and their re
 
 ## Run it
 
-1. **Server** (port 3001):
+1. **Server** (port 3001), from the repo root:
+
+   Linux / macOS:
    ```bash
-   cd server
-   npm install
-   npm run reset
-   npm run dev
+   cd server && npm install && npm run reset && npm run dev
    ```
+
+   Windows (PowerShell):
+   ```powershell
+   cd server; npm install; if ($?) { npm run reset; if ($?) { npm run dev } }
+   ```
+
    `npm run reset` restores the seed data, deletes uploaded photos and signs everyone out. `npm test` runs the server's test suite.
 
 2. **Dashboard** (port 3000), in a second terminal:
