@@ -60,16 +60,20 @@ class IncidentRepositoryImpl @Inject constructor(
         // A report the server doesn't know yet has all its details on the device
         val serverId = stored.serverId ?: return@withContext
 
-        val dto = remoteDataSource.fetchIncident(serverId)
-        localDataSource.inTransaction {
-            // Read again: the row may have changed while the download was in flight
-            val current = localDataSource.getIncident(localId) ?: return@inTransaction
-            if (current.syncState == SyncState.Synced) {
-                localDataSource.updateIncident(converter.withDetails(current, dto))
-                localDataSource.replacePhotos(localId, converter.convertPhotos(localId, dto))
-            } else {
-                // A pending change keeps its report fields until the server accepts it
-                localDataSource.updateIncident(converter.withStatus(current, dto))
+        // Never during a push: details downloaded before a pending edit was accepted would overwrite it,
+        // since the push marks the row as synced
+        syncLock.withLock {
+            val dto = remoteDataSource.fetchIncident(serverId)
+            localDataSource.inTransaction {
+                // Read again: the row may have changed while the download was in flight
+                val current = localDataSource.getIncident(localId) ?: return@inTransaction
+                if (current.syncState == SyncState.Synced) {
+                    localDataSource.updateIncident(converter.withDetails(current, dto))
+                    localDataSource.replacePhotos(localId, converter.convertPhotos(localId, dto))
+                } else {
+                    // A pending change keeps its report fields until the server accepts it
+                    localDataSource.updateIncident(converter.withStatus(current, dto))
+                }
             }
         }
     }
@@ -129,6 +133,10 @@ class IncidentRepositoryImpl @Inject constructor(
 
     override suspend fun deletePhoto(photo: Photo.Local) = withContext(dispatchers.io) {
         photoLocalDataSource.deletePhoto(photo.path)
+    }
+
+    override suspend fun getPhotoSize(photo: Photo.Local): Long = withContext(dispatchers.io) {
+        photoLocalDataSource.sizeOf(photo.path)
     }
 
     private suspend fun pullSummariesLocked() {

@@ -25,6 +25,11 @@ sealed interface IncidentFormEvent {
     data object PickPhoto : IncidentFormEvent
 
     /**
+     * A photo was too large to upload and wasn't attached; the screen shows a snackbar
+     */
+    data object PhotoTooLarge : IncidentFormEvent
+
+    /**
      * The report was saved; the screen goes back with a "saved" result
      */
     data object Saved : IncidentFormEvent

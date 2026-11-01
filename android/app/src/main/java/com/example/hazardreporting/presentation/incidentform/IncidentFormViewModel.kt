@@ -3,6 +3,7 @@ package com.example.hazardreporting.presentation.incidentform
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.viewModelScope
 import androidx.navigation.toRoute
+import com.example.hazardreporting.domain.exception.PhotoTooLargeException
 import com.example.hazardreporting.domain.exception.ValidationException
 import com.example.hazardreporting.domain.interactor.CatalogInteractor
 import com.example.hazardreporting.domain.interactor.IncidentInteractor
@@ -188,13 +189,26 @@ class IncidentFormViewModel @Inject constructor(
     }
 
     /**
-     * Attaches the photo the camera took, or deletes its file if no picture was taken
+     * Attaches the photo the camera took, or deletes its file if no picture was taken. A photo too large to upload
+     * is deleted, and the screen says why
      *
      * @param isTaken whether the camera saved a picture
      */
     fun onPhotoTaken(isTaken: Boolean) {
         val path = form.getAndUpdate { it.copy(pendingCameraPhotoPath = null) }.pendingCameraPhotoPath ?: return
-        if (isTaken) attachPhoto(Photo.Local(path)) else discardPhotos(listOf(path))
+        if (!isTaken) {
+            discardPhotos(listOf(path))
+            return
+        }
+        viewModelScope.launch(exceptionHandler + dispatchers.default) {
+            val photo = Photo.Local(path)
+            try {
+                incidentInteractor.checkPhoto(photo)
+                attachPhoto(photo)
+            } catch (e: PhotoTooLargeException) {
+                _events.send(IncidentFormEvent.PhotoTooLarge)
+            }
+        }
     }
 
     /**
@@ -206,14 +220,19 @@ class IncidentFormViewModel @Inject constructor(
     }
 
     /**
-     * Copies the picture the technician picked into the app's photo storage straight away and attaches the copy
+     * Copies the picture the technician picked into the app's photo storage straight away and attaches the copy.
+     * A picture too large to upload isn't attached, and the screen says why
      *
      * @param sourceUri URI of the picked picture, or null if nothing was picked
      */
     fun onPhotoPicked(sourceUri: String?) {
         if (sourceUri == null) return
         viewModelScope.launch(exceptionHandler + dispatchers.default) {
-            attachPhoto(incidentInteractor.importPhoto(sourceUri))
+            try {
+                attachPhoto(incidentInteractor.importPhoto(sourceUri))
+            } catch (e: PhotoTooLargeException) {
+                _events.send(IncidentFormEvent.PhotoTooLarge)
+            }
         }
     }
 
@@ -292,9 +311,11 @@ class IncidentFormViewModel @Inject constructor(
     }
 
     /**
-     * Leaves the form on Back or ✕: at once if nothing changed, otherwise after "Discard changes?"
+     * Leaves the form on Back or ✕: at once if nothing changed, otherwise after "Discard changes?".
+     * Ignored while saving: the form leaves once the save is done
      */
     fun onCloseRequest() {
+        if (isSaving.value) return
         if (form.value.hasUnsavedChanges) {
             overlays.update { it.copy(isDiscardDialogVisible = true) }
         } else {
@@ -303,10 +324,12 @@ class IncidentFormViewModel @Inject constructor(
     }
 
     /**
-     * Discards the changes: deletes the photo files this form created and leaves the form
+     * Discards the changes: deletes the photo files this form created and leaves the form. Ignored while saving,
+     * since the save may already refer to those files
      */
     fun onDiscardConfirm() {
         overlays.update { it.copy(isDiscardDialogVisible = false) }
+        if (isSaving.value) return
         val addedPhotoPaths = form.value.addedPhotoPaths
         viewModelScope.launch(exceptionHandler + dispatchers.default) {
             addedPhotoPaths.forEach { incidentInteractor.discardPhoto(Photo.Local(it)) }

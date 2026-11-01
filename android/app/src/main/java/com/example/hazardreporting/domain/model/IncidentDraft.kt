@@ -86,5 +86,10 @@ data class IncidentDraft(
          * Most photos an incident may have
          */
         const val MAX_PHOTOS = 3
+
+        /**
+         * Largest photo file the server accepts, in bytes
+         */
+        const val MAX_PHOTO_BYTES = 15L * 1024 * 1024
     }
 }
