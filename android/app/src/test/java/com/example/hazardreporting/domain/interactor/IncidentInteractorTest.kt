@@ -338,6 +338,15 @@ class IncidentInteractorTest {
     }
 
     @Test
+    fun testIsLocationEnabled() {
+        every { locationProvider.isLocationEnabled() } returns false
+
+        Truth.assertThat(interactor.isLocationEnabled()).isFalse()
+
+        verifySequence { locationProvider.isLocationEnabled() }
+    }
+
+    @Test
     fun testCreatePhotoFile() = runTest {
         coEvery { incidentRepository.createPhotoFile() } returns PHOTO
 

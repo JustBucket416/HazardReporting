@@ -179,6 +179,11 @@ class IncidentInteractor(
     suspend fun capturePosition(): Position? = locationProvider.currentPosition()
 
     /**
+     * Returns whether location is turned on on the device; while it's off, [capturePosition] finds nothing
+     */
+    fun isLocationEnabled(): Boolean = locationProvider.isLocationEnabled()
+
+    /**
      * Creates a path in the app's private photo storage for the camera to write a new photo to
      */
     suspend fun createPhotoFile(): Photo.Local = incidentRepository.createPhotoFile()

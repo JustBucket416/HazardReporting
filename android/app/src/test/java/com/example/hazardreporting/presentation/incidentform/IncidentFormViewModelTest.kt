@@ -67,6 +67,7 @@ class IncidentFormViewModelTest {
         every { catalogInteractor.observeSeverities() } returns flowOf(listOf(SEVERITY))
         every { catalogInteractor.observeSites() } returns flowOf(listOf(SITE))
         every { incidentInteractor.validate(any()) } returns emptySet()
+        every { incidentInteractor.isLocationEnabled() } returns true
         coJustRun { incidentInteractor.discardPhoto(any()) }
     }
 
@@ -293,6 +294,80 @@ class IncidentFormViewModelTest {
         advanceUntilIdle()
 
         Truth.assertThat(draft.captured.position).isNull()
+    }
+
+    @Test
+    fun testOnLocationPermissionResult_LocationOff() = runTest {
+        every { incidentInteractor.isLocationEnabled() } returns false
+
+        val viewModel = createViewModel()
+        collectUiState(viewModel)
+
+        viewModel.events.test {
+            Truth.assertThat(awaitItem()).isEqualTo(IncidentFormEvent.RequestLocationPermission)
+
+            viewModel.onLocationPermissionResult(isGranted = true)
+
+            // No fix arrives while location is off, so the technician is asked to turn it on first
+            Truth.assertThat(awaitItem()).isEqualTo(IncidentFormEvent.RequestEnableLocation)
+        }
+        advanceUntilIdle()
+
+        coVerify(exactly = 0) { incidentInteractor.capturePosition() }
+        Truth.assertThat(viewModel.uiState.value.positionStatus).isEqualTo(PositionStatus.Locating)
+    }
+
+    @Test
+    fun testOnEnableLocationResult_Enabled() = runTest {
+        coEvery { incidentInteractor.capturePosition() } returns POSITION
+
+        val viewModel = createViewModel()
+        collectUiState(viewModel)
+
+        viewModel.onEnableLocationResult(isEnabled = true)
+        advanceUntilIdle()
+
+        Truth.assertThat(viewModel.uiState.value.position).isEqualTo(POSITION)
+        Truth.assertThat(viewModel.uiState.value.positionStatus).isEqualTo(PositionStatus.Captured)
+    }
+
+    @Test
+    fun testOnEnableLocationResult_Declined() = runTest {
+        val viewModel = createViewModel()
+        collectUiState(viewModel)
+
+        viewModel.onEnableLocationResult(isEnabled = false)
+        advanceUntilIdle()
+
+        coVerify(exactly = 0) { incidentInteractor.capturePosition() }
+        Truth.assertThat(viewModel.uiState.value.position).isNull()
+        Truth.assertThat(viewModel.uiState.value.positionStatus).isEqualTo(PositionStatus.LocationOff)
+
+        // The report still saves, without a position
+        val draft = slot<IncidentDraft>()
+        coEvery { incidentInteractor.report(capture(draft)) } returns 1L
+        viewModel.onSave()
+        advanceUntilIdle()
+
+        Truth.assertThat(draft.captured.position).isNull()
+    }
+
+    @Test
+    fun testOnEnableLocationResult_WhileCapturing() = runTest {
+        val capture = CompletableDeferred<Position?>()
+
+        coEvery { incidentInteractor.capturePosition() } coAnswers { capture.await() }
+
+        val viewModel = createViewModel()
+        collectUiState(viewModel)
+        viewModel.onLocationPermissionResult(isGranted = true)
+        advanceUntilIdle()
+        viewModel.onEnableLocationResult(isEnabled = false)
+        capture.complete(POSITION)
+        advanceUntilIdle()
+
+        // The answer is ignored while a capture runs, so its fix isn't thrown away
+        Truth.assertThat(viewModel.uiState.value.positionStatus).isEqualTo(PositionStatus.Captured)
     }
 
     @Test
