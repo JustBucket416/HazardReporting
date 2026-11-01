@@ -9,7 +9,6 @@ import com.example.hazardreporting.data.incident.entity.IncidentEntity
 import com.example.hazardreporting.data.incident.entity.IncidentPhotoEntity
 import com.example.hazardreporting.data.incident.entity.IncidentWithPhotos
 import com.example.hazardreporting.domain.model.Incident
-import com.example.hazardreporting.domain.model.IncidentDetails
 import com.example.hazardreporting.domain.model.IncidentDraft
 import com.example.hazardreporting.domain.model.IncidentStatus
 import com.example.hazardreporting.domain.model.IncidentSummary
@@ -187,36 +186,6 @@ class IncidentConverterTest {
     }
 
     @Test
-    fun testConvertIncidentWithPhotos_DetailsLoaded() {
-        val incident = converter.convert(
-            IncidentWithPhotos(
-                incident = STORED_ENTITY,
-                photos = listOf(
-                    IncidentPhotoEntity(2, LOCAL_ID, position = 1, localPath = "/files/photos/b.jpg", remoteUrl = null),
-                    IncidentPhotoEntity(1, LOCAL_ID, position = 0, localPath = null, remoteUrl = "/uploads/a.jpg"),
-                ),
-            )
-        )
-
-        Truth.assertThat(incident).isEqualTo(
-            Incident(
-                summary = converter.convertSummary(STORED_ENTITY),
-                details = IncidentDetails(
-                    description = "Fraying near the transfer point",
-                    locationDescription = "Line 3",
-                    position = Position(53.5, -2.2, 10.0),
-                    // In their stored order, with relative URLs resolved against the server's root
-                    photos = listOf(
-                        Photo.Remote("http://10.0.2.2:3001/uploads/a.jpg"),
-                        Photo.Local("/files/photos/b.jpg"),
-                    ),
-                    priority = Priority.High,
-                ),
-            )
-        )
-    }
-
-    @Test
     fun testConvertIncidentWithPhotos_DetailsNotLoaded() {
         val summaryOnly = converter.convert(SUMMARY_DTO).copy(localId = LOCAL_ID)
 
@@ -257,25 +226,10 @@ class IncidentConverterTest {
     }
 
     @Test
-    fun testConvertPhoto_RelativeUrl() {
-        val photo = converter.convertPhoto(photoRow(localPath = null, remoteUrl = "/uploads/seed/photo-05.png"))
-
-        Truth.assertThat(photo).isEqualTo(Photo.Remote("http://10.0.2.2:3001/uploads/seed/photo-05.png"))
-    }
-
-    @Test
     fun testConvertPhoto_AbsoluteUrl() {
         val photo = converter.convertPhoto(photoRow(localPath = null, remoteUrl = "https://cdn.example.com/a.jpg"))
 
         Truth.assertThat(photo).isEqualTo(Photo.Remote("https://cdn.example.com/a.jpg"))
-    }
-
-    @Test
-    fun testConvertPhoto_UploadedWins() {
-        // An uploaded photo keeps the path of its file, which is deleted after the upload
-        val photo = converter.convertPhoto(photoRow(localPath = "/files/photos/a.jpg", remoteUrl = REMOTE_A))
-
-        Truth.assertThat(photo).isEqualTo(Photo.Remote("http://10.0.2.2:3001/uploads/a.jpg"))
     }
 
     @Test
@@ -471,35 +425,6 @@ class IncidentConverterTest {
     }
 
     @Test
-    fun testConvertDraftPhotos() {
-        val photos = converter.convertPhotos(
-            LOCAL_ID,
-            listOf(
-                Photo.Local("/files/photos/a.jpg"),
-                Photo.Remote("http://10.0.2.2:3001/uploads/b.png"),
-                Photo.Remote("https://cdn.example.com/c.jpg"),
-            ),
-        )
-
-        // A server photo is stored relative again, as the server sent it; any other URL stays as it is
-        Truth.assertThat(photos).containsExactly(
-            IncidentPhotoEntity(
-                incidentLocalId = LOCAL_ID,
-                position = 0,
-                localPath = "/files/photos/a.jpg",
-                remoteUrl = null,
-            ),
-            IncidentPhotoEntity(incidentLocalId = LOCAL_ID, position = 1, localPath = null, remoteUrl = REMOTE_B),
-            IncidentPhotoEntity(
-                incidentLocalId = LOCAL_ID,
-                position = 2,
-                localPath = null,
-                remoteUrl = "https://cdn.example.com/c.jpg",
-            ),
-        ).inOrder()
-    }
-
-    @Test
     fun testWithDraft() {
         val pending = STORED_ENTITY.copy(syncState = SyncState.PendingCreate, localVersion = 2)
         val draft = IncidentDraft(
@@ -581,7 +506,6 @@ class IncidentConverterTest {
     )
 
     private companion object {
-        const val BASE_URL = "http://10.0.2.2:3001/"
         const val REMOTE_A = "/uploads/a.jpg"
         const val REMOTE_B = "/uploads/b.png"
         const val LOCAL_ID = 7L

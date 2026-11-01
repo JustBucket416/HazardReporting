@@ -61,13 +61,3 @@ The app accepts technicians only, and the dashboard accepts operators only.
 5. Withdraw an Open incident in the app. It disappears from the app and shows as Withdrawn on the dashboard.
 6. On the dashboard, filter by severity Critical and status Open, add a note to an incident and resolve one. In the app, pull to refresh: the incident shows Resolved, but never the note or the assignee.
 7. Go offline, report another incident, and log out. The app warns that 1 report will be lost before it wipes the device.
-
-## Android builds on Windows
-
-If Gradle fails with `Unable to establish loopback connection`, point Java at a temp folder without a short (8.3) path name, for example:
-
-```powershell
-$env:JAVA_TOOL_OPTIONS = "-Djdk.net.unixdomain.tmpdir=F:\tmp"
-```
-
-If KSP fails with an incremental-cache error about "different roots" (Gradle cache and project on different drives), delete `android/app/build/kspCaches` and build again.
