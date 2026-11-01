@@ -14,4 +14,10 @@ interface LocationProvider {
      * or no fresh enough fix is available. Never throws for a missing fix
      */
     suspend fun currentPosition(): Position?
+
+    /**
+     * Returns whether location is turned on in the device's settings. While it's off, no fix arrives,
+     * whatever the permissions
+     */
+    fun isLocationEnabled(): Boolean
 }

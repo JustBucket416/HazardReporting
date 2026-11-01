@@ -110,6 +110,9 @@ fun IncidentFormRoute(viewModel: IncidentFormViewModel, onClose: () -> Unit, onS
         // Approximate location is enough
         viewModel.onLocationPermissionResult(isGranted = results.values.any { it })
     }
+    val requestEnableLocation = rememberEnableLocationRequest { isEnabled ->
+        viewModel.onEnableLocationResult(isEnabled)
+    }
     val cameraLauncher = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { isTaken ->
         viewModel.onPhotoTaken(isTaken)
     }
@@ -120,6 +123,7 @@ fun IncidentFormRoute(viewModel: IncidentFormViewModel, onClose: () -> Unit, onS
     CollectEvents(viewModel.events) { event ->
         when (event) {
             IncidentFormEvent.RequestLocationPermission -> permissionLauncher.launch(LOCATION_PERMISSIONS)
+            IncidentFormEvent.RequestEnableLocation -> requestEnableLocation()
             is IncidentFormEvent.TakePhoto -> {
                 val uri = FileProvider.getUriForFile(
                     context,
@@ -537,6 +541,7 @@ private fun PositionLine(position: Position?, status: PositionStatus, onRecaptur
                 PositionStatus.Locating -> stringResource(R.string.incident_form_locating)
                 PositionStatus.Captured -> position?.label() ?: stringResource(R.string.incident_form_no_position)
                 PositionStatus.Unavailable -> stringResource(R.string.incident_form_no_position)
+                PositionStatus.LocationOff -> stringResource(R.string.incident_form_location_off)
             }
             Text(
                 text = text,

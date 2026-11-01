@@ -213,4 +213,10 @@ enum class PositionStatus {
      * Permission was denied or no fix was available; the report is saved without a position
      */
     Unavailable,
+
+    /**
+     * Location is turned off on the device and the technician didn't turn it on; the report is saved without
+     * a position
+     */
+    LocationOff,
 }

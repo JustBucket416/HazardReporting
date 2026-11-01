@@ -98,6 +98,7 @@
     <string name="incident_form_no_camera">No camera app available</string>
     <string name="incident_form_locating">Locating…</string>
     <string name="incident_form_no_position">No position</string>
+    <string name="incident_form_location_off">Location is off</string>
     <string name="incident_form_recapture">Re-capture</string>
     <!-- Characters used and allowed, e.g. "12 / 80" -->
     <string name="incident_form_character_count">%1$d / %2$d</string>
