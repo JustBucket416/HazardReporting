@@ -93,4 +93,9 @@ interface IncidentRepository {
      * Deletes the file of [photo] from the app's private photo storage. A file outside it is left alone
      */
     suspend fun deletePhoto(photo: Photo.Local)
+
+    /**
+     * Returns the size of [photo]'s file in bytes, or 0 if it doesn't exist
+     */
+    suspend fun getPhotoSize(photo: Photo.Local): Long
 }

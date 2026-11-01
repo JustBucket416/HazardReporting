@@ -150,6 +150,18 @@ class PhotoLocalDataSourceTest {
     }
 
     @Test
+    fun testSizeOf() {
+        val file = File(dataSource.createPhotoFile()).apply { writeBytes(JPEG_CONTENT) }
+
+        Truth.assertThat(dataSource.sizeOf(file.path)).isEqualTo(JPEG_CONTENT.size.toLong())
+    }
+
+    @Test
+    fun testSizeOf_Missing() {
+        Truth.assertThat(dataSource.sizeOf(File(photosDirectory, "gone.jpg").path)).isEqualTo(0L)
+    }
+
+    @Test
     fun testFormatOf() {
         val jpeg = File(dataSource.createPhotoFile()).apply { writeBytes(JPEG_CONTENT) }
         val png = File(photosDirectory, "b.png").apply { writeBytes(PNG_CONTENT) }

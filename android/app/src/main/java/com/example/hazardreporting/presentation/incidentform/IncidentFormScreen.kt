@@ -102,6 +102,7 @@ fun IncidentFormRoute(viewModel: IncidentFormViewModel, onClose: () -> Unit, onS
     val snackbarHostState = remember { SnackbarHostState() }
     val coroutineScope = rememberCoroutineScope()
     val noCameraMessage = stringResource(R.string.incident_form_no_camera)
+    val photoTooLargeMessage = stringResource(R.string.incident_form_photo_too_large)
     val unexpectedErrorMessage = stringResource(R.string.error_unexpected)
 
     val permissionLauncher = rememberLauncherForActivityResult(
@@ -140,6 +141,9 @@ fun IncidentFormRoute(viewModel: IncidentFormViewModel, onClose: () -> Unit, onS
             IncidentFormEvent.PickPhoto -> photoPickerLauncher.launch(
                 PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
             )
+            IncidentFormEvent.PhotoTooLarge -> coroutineScope.launch {
+                snackbarHostState.showSnackbar(photoTooLargeMessage)
+            }
             IncidentFormEvent.Saved -> onSaved()
             IncidentFormEvent.Closed -> onClose()
             IncidentFormEvent.UnexpectedError -> coroutineScope.launch {

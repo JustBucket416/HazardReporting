@@ -1,5 +1,6 @@
 package com.example.hazardreporting.domain.interactor
 
+import com.example.hazardreporting.domain.exception.PhotoTooLargeException
 import com.example.hazardreporting.domain.exception.UnauthorizedException
 import com.example.hazardreporting.domain.exception.ValidationException
 import com.example.hazardreporting.domain.model.Incident
@@ -192,8 +193,26 @@ class IncidentInteractor(
      * Copies the picture at [sourceUri], e.g. one picked from the gallery, into the app's private photo storage
      *
      * @return the copy, ready to attach to a draft
+     * @throws PhotoTooLargeException if the copy is too large to upload; it is deleted
      */
-    suspend fun importPhoto(sourceUri: String): Photo.Local = incidentRepository.importPhoto(sourceUri)
+    suspend fun importPhoto(sourceUri: String): Photo.Local {
+        val photo = incidentRepository.importPhoto(sourceUri)
+        checkPhoto(photo)
+        return photo
+    }
+
+    /**
+     * Checks that [photo], e.g. one the camera just took, can be uploaded. Photos are sent as they are, never
+     * downscaled, so one larger than [IncidentDraft.MAX_PHOTO_BYTES] can never be sent: it is deleted instead of attached
+     *
+     * @throws PhotoTooLargeException if [photo] is too large
+     */
+    suspend fun checkPhoto(photo: Photo.Local) {
+        if (incidentRepository.getPhotoSize(photo) > IncidentDraft.MAX_PHOTO_BYTES) {
+            incidentRepository.deletePhoto(photo)
+            throw PhotoTooLargeException()
+        }
+    }
 
     /**
      * Deletes [photo], a file taken or imported for a draft that won't be saved with it

@@ -29,15 +29,16 @@ class SyncSchedulerImplTest {
     fun testSchedulePush() {
         val request = slot<OneTimeWorkRequest>()
 
-        every { workManager.enqueueUniqueWork("sync-once", ExistingWorkPolicy.KEEP, capture(request)) } returns
+        every { workManager.enqueueUniqueWork("sync-once", ExistingWorkPolicy.APPEND_OR_REPLACE, capture(request)) } returns
             mockk<Operation>()
 
         scheduler.schedulePush()
 
         verifySequence {
-            workManager.enqueueUniqueWork("sync-once", ExistingWorkPolicy.KEEP, any<OneTimeWorkRequest>())
+            workManager.enqueueUniqueWork("sync-once", ExistingWorkPolicy.APPEND_OR_REPLACE, any<OneTimeWorkRequest>())
         }
 
+        // Appended after a push that is waiting or running, which may have missed the change that scheduled this one.
         // A SyncWorker run once the device is online, backing off exponentially
         val workSpec = request.captured.workSpec
         Truth.assertThat(workSpec.workerClassName).isEqualTo(SyncWorker::class.java.name)

@@ -65,6 +65,11 @@ class PhotoLocalDataSource @Inject constructor(
     }
 
     /**
+     * Returns the size of the file at [path] in bytes, or 0 if it doesn't exist
+     */
+    fun sizeOf(path: String): Long = File(path).length()
+
+    /**
      * Returns the format of the photo file at [path], recognised by its first bytes, or null if the file
      * doesn't exist or is in a format the server doesn't accept
      *

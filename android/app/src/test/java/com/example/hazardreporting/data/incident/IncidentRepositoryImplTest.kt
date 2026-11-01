@@ -351,6 +351,32 @@ class IncidentRepositoryImplTest {
     }
 
     @Test
+    fun testLoadDetails_WaitsForSyncLock() = runTest {
+        val push = CompletableDeferred<Unit>()
+
+        val dto = mockk<IncidentDto>()
+
+        coEvery { localDataSource.getIncident(LOCAL_ID) } returns SYNCED_ROW
+        coEvery { remoteDataSource.fetchIncident("inc-1") } returns dto
+        every { converter.withDetails(SYNCED_ROW, dto) } returns SYNCED_ROW
+        every { converter.convertPhotos(LOCAL_ID, dto) } returns emptyList()
+        coJustRun { localDataSource.updateIncident(SYNCED_ROW) }
+        coJustRun { localDataSource.replacePhotos(LOCAL_ID, emptyList()) }
+
+        val pushing = launch(UnconfinedTestDispatcher(testScheduler)) { syncLock.withLock { push.await() } }
+        val loading = launch(UnconfinedTestDispatcher(testScheduler)) { repository.loadDetails(LOCAL_ID, force = true) }
+
+        // Details downloaded before a pending edit was accepted would overwrite it once the push marks it synced
+        coVerify(exactly = 0) { remoteDataSource.fetchIncident(any()) }
+
+        push.complete(Unit)
+        pushing.join()
+        loading.join()
+
+        coVerify(exactly = 1) { remoteDataSource.fetchIncident("inc-1") }
+    }
+
+    @Test
     fun testLoadDetails_NoConnection() {
         coEvery { localDataSource.getIncident(LOCAL_ID) } returns SYNCED_ROW
         coEvery { remoteDataSource.fetchIncident("inc-1") } throws NoConnectionException()
@@ -557,6 +583,13 @@ class IncidentRepositoryImplTest {
         repository.deletePhoto(Photo.Local("/files/photos/a.jpg"))
 
         verifySequence { photoLocalDataSource.deletePhoto("/files/photos/a.jpg") }
+    }
+
+    @Test
+    fun testGetPhotoSize() = runTest {
+        every { photoLocalDataSource.sizeOf("/files/photos/a.jpg") } returns 2048L
+
+        Truth.assertThat(repository.getPhotoSize(Photo.Local("/files/photos/a.jpg"))).isEqualTo(2048L)
     }
 
     private suspend fun verifyDownloadsDetails(stored: IncidentEntity, force: Boolean) {

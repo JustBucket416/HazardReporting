@@ -2,6 +2,7 @@ package com.example.hazardreporting.domain.interactor
 
 import app.cash.turbine.test
 import com.example.hazardreporting.domain.exception.NoConnectionException
+import com.example.hazardreporting.domain.exception.PhotoTooLargeException
 import com.example.hazardreporting.domain.exception.UnauthorizedException
 import com.example.hazardreporting.domain.exception.ValidationException
 import com.example.hazardreporting.domain.model.Incident
@@ -358,10 +359,52 @@ class IncidentInteractorTest {
     @Test
     fun testImportPhoto() = runTest {
         coEvery { incidentRepository.importPhoto(SOURCE_URI) } returns PHOTO
+        coEvery { incidentRepository.getPhotoSize(PHOTO) } returns IncidentDraft.MAX_PHOTO_BYTES
 
         Truth.assertThat(interactor.importPhoto(SOURCE_URI)).isEqualTo(PHOTO)
 
-        coVerifySequence { incidentRepository.importPhoto(SOURCE_URI) }
+        coVerifySequence {
+            incidentRepository.importPhoto(SOURCE_URI)
+            incidentRepository.getPhotoSize(PHOTO)
+        }
+    }
+
+    @Test
+    fun testImportPhoto_TooLarge() {
+        coEvery { incidentRepository.importPhoto(SOURCE_URI) } returns PHOTO
+        coEvery { incidentRepository.getPhotoSize(PHOTO) } returns IncidentDraft.MAX_PHOTO_BYTES + 1
+        coJustRun { incidentRepository.deletePhoto(PHOTO) }
+
+        Assert.assertThrows(PhotoTooLargeException::class.java) {
+            runTest { interactor.importPhoto(SOURCE_URI) }
+        }
+
+        // The server would refuse it, so the copy isn't kept
+        coVerify { incidentRepository.deletePhoto(PHOTO) }
+    }
+
+    @Test
+    fun testCheckPhoto() = runTest {
+        coEvery { incidentRepository.getPhotoSize(PHOTO) } returns 1024L
+
+        interactor.checkPhoto(PHOTO)
+
+        coVerifySequence { incidentRepository.getPhotoSize(PHOTO) }
+    }
+
+    @Test
+    fun testCheckPhoto_TooLarge() {
+        coEvery { incidentRepository.getPhotoSize(PHOTO) } returns IncidentDraft.MAX_PHOTO_BYTES + 1
+        coJustRun { incidentRepository.deletePhoto(PHOTO) }
+
+        Assert.assertThrows(PhotoTooLargeException::class.java) {
+            runTest { interactor.checkPhoto(PHOTO) }
+        }
+
+        coVerifySequence {
+            incidentRepository.getPhotoSize(PHOTO)
+            incidentRepository.deletePhoto(PHOTO)
+        }
     }
 
     @Test

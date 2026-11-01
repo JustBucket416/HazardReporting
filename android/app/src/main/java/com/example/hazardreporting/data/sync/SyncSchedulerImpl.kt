@@ -15,7 +15,7 @@ import javax.inject.Inject
 /**
  * Implementation of [SyncScheduler] with WorkManager (spec § 3.4). Both kinds of work run [SyncWorker] only while
  * the device is online, and back off exponentially when it asks for a retry:
- * - [SYNC_ONCE], unique one-shot work that is kept rather than replaced while it is scheduled or running
+ * - [SYNC_ONCE], unique one-shot work; a push scheduled while one is waiting or running runs after it
  * - [SYNC_PERIODIC], unique work every 15 minutes
  *
  * @property workManager schedules the work
@@ -35,8 +35,9 @@ class SyncSchedulerImpl @Inject constructor(
             .setConstraints(constraints)
             .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, BACKOFF_DELAY)
             .build()
-        // A push that is already running sends changes saved while it runs, too
-        workManager.enqueueUniqueWork(SYNC_ONCE, ExistingWorkPolicy.KEEP, request)
+        // Appended rather than kept: a running push may already have looked for the last pending change, so only
+        // a push after it is sure to send this one. A failed or cancelled push is replaced
+        workManager.enqueueUniqueWork(SYNC_ONCE, ExistingWorkPolicy.APPEND_OR_REPLACE, request)
     }
 
     override fun schedulePeriodicPush() {

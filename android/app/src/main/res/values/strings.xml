@@ -96,6 +96,7 @@
     <string name="incident_form_camera">Camera</string>
     <string name="incident_form_gallery">Gallery</string>
     <string name="incident_form_no_camera">No camera app available</string>
+    <string name="incident_form_photo_too_large">Photo is larger than 15 MB, so it can\'t be sent</string>
     <string name="incident_form_locating">Locating…</string>
     <string name="incident_form_no_position">No position</string>
     <string name="incident_form_location_off">Location is off</string>

@@ -4,6 +4,7 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.navigation.toRoute
 import app.cash.turbine.ReceiveTurbine
 import app.cash.turbine.test
+import com.example.hazardreporting.domain.exception.PhotoTooLargeException
 import com.example.hazardreporting.domain.exception.ValidationException
 import com.example.hazardreporting.domain.interactor.CatalogInteractor
 import com.example.hazardreporting.domain.interactor.IncidentInteractor
@@ -69,6 +70,7 @@ class IncidentFormViewModelTest {
         every { incidentInteractor.validate(any()) } returns emptySet()
         every { incidentInteractor.isLocationEnabled() } returns true
         coJustRun { incidentInteractor.discardPhoto(any()) }
+        coJustRun { incidentInteractor.checkPhoto(any()) }
     }
 
     @After
@@ -533,6 +535,8 @@ class IncidentFormViewModelTest {
             advanceUntilIdle()
             Truth.assertThat(awaitItem()).isEqualTo(IncidentFormEvent.TakePhoto(PHOTO.path))
             viewModel.onPhotoTaken(isTaken = true)
+            // Attached once its size is checked
+            advanceUntilIdle()
 
             viewModel.onSave()
             advanceUntilIdle()
@@ -691,6 +695,48 @@ class IncidentFormViewModelTest {
     }
 
     @Test
+    fun testOnPhotoPicked_TooLarge() = runTest {
+        coEvery { incidentInteractor.importPhoto(SOURCE_URI) } throws PhotoTooLargeException()
+
+        val viewModel = createViewModel()
+        collectUiState(viewModel)
+
+        viewModel.events.test {
+            skipPermissionRequest()
+
+            viewModel.onPhotoPicked(SOURCE_URI)
+            advanceUntilIdle()
+
+            Truth.assertThat(awaitItem()).isEqualTo(IncidentFormEvent.PhotoTooLarge)
+        }
+        Truth.assertThat(viewModel.uiState.value.photos).isEmpty()
+    }
+
+    @Test
+    fun testOnPhotoTaken_TooLarge() = runTest {
+        coEvery { incidentInteractor.createPhotoFile() } returns PHOTO
+        coEvery { incidentInteractor.checkPhoto(PHOTO) } throws PhotoTooLargeException()
+
+        val viewModel = createViewModel()
+        collectUiState(viewModel)
+
+        viewModel.events.test {
+            skipPermissionRequest()
+
+            viewModel.onCameraSelect()
+            advanceUntilIdle()
+            Truth.assertThat(awaitItem()).isEqualTo(IncidentFormEvent.TakePhoto(PHOTO.path))
+
+            viewModel.onPhotoTaken(isTaken = true)
+            advanceUntilIdle()
+
+            // The interactor deleted the file; the screen says why nothing was attached
+            Truth.assertThat(awaitItem()).isEqualTo(IncidentFormEvent.PhotoTooLarge)
+        }
+        Truth.assertThat(viewModel.uiState.value.photos).isEmpty()
+    }
+
+    @Test
     fun testOnPhotoPicked_NoRoomLeft() = runTest {
         val photos = List(IncidentDraft.MAX_PHOTOS + 1) { Photo.Local("/files/photos/$it.jpg") }
         photos.forEachIndexed { index, photo ->
@@ -781,6 +827,56 @@ class IncidentFormViewModelTest {
 
         Truth.assertThat(viewModel.uiState.value.isDiscardDialogVisible).isFalse()
         Truth.assertThat(viewModel.uiState.value.title).isEqualTo("Leaking valve")
+    }
+
+    @Test
+    fun testOnCloseRequest_WhileSaving() = runTest {
+        val report = CompletableDeferred<Long>()
+
+        coEvery { incidentInteractor.report(any()) } coAnswers { report.await() }
+
+        val viewModel = createViewModel()
+        collectUiState(viewModel)
+        viewModel.onTitleChange("Leaking valve")
+        viewModel.onSave()
+        advanceUntilIdle()
+
+        viewModel.events.test {
+            skipPermissionRequest()
+
+            viewModel.onCloseRequest()
+            advanceUntilIdle()
+
+            // The form leaves once the save is done, not before
+            expectNoEvents()
+        }
+        Truth.assertThat(viewModel.uiState.value.isDiscardDialogVisible).isFalse()
+        report.complete(1L)
+    }
+
+    @Test
+    fun testOnDiscardConfirm_WhileSaving() = runTest {
+        val report = CompletableDeferred<Long>()
+
+        coEvery { incidentInteractor.importPhoto(SOURCE_URI) } returns PHOTO
+        coEvery { incidentInteractor.report(any()) } coAnswers { report.await() }
+
+        val viewModel = createViewModel()
+        collectUiState(viewModel)
+        viewModel.onPhotoPicked(SOURCE_URI)
+        advanceUntilIdle()
+        // "Discard changes?" is already open when the save starts
+        viewModel.onCloseRequest()
+        viewModel.onSave()
+        advanceUntilIdle()
+
+        viewModel.onDiscardConfirm()
+        report.complete(1L)
+        advanceUntilIdle()
+
+        // The save may already refer to the photo, so its file stays
+        coVerify(exactly = 0) { incidentInteractor.discardPhoto(any()) }
+        Truth.assertThat(viewModel.uiState.value.isDiscardDialogVisible).isFalse()
     }
 
     @Test
