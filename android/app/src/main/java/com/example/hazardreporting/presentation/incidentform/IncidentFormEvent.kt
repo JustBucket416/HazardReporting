@@ -13,6 +13,12 @@ sealed interface IncidentFormEvent {
     data object RequestLocationPermission : IncidentFormEvent
 
     /**
+     * Location is turned off on the device; the screen asks the technician to turn it on and reports whether it is
+     * on afterwards
+     */
+    data object RequestEnableLocation : IncidentFormEvent
+
+    /**
      * The screen opens the camera to take a picture into the file at [path]
      *
      * @property path absolute path of the file in the app's photo storage

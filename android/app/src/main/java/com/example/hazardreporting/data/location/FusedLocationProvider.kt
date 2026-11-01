@@ -4,8 +4,10 @@ import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
 import android.location.Location
+import android.location.LocationManager
 import android.os.SystemClock
 import androidx.core.content.ContextCompat
+import androidx.core.location.LocationManagerCompat
 import com.example.hazardreporting.domain.model.Position
 import com.example.hazardreporting.domain.repository.LocationProvider
 import com.google.android.gms.location.FusedLocationProviderClient
@@ -25,12 +27,14 @@ import kotlinx.coroutines.withTimeoutOrNull
  *
  * @property context used for checking the location permissions
  * @property client the fused location provider
+ * @property locationManager used for checking whether location is turned on
  *
  * @author Roman Pliskin on 29.10.2026
  */
 class FusedLocationProvider @Inject constructor(
     private val context: Context,
     private val client: FusedLocationProviderClient,
+    private val locationManager: LocationManager,
 ) : LocationProvider {
 
     override suspend fun currentPosition(): Position? {
@@ -39,6 +43,8 @@ class FusedLocationProvider @Inject constructor(
             ?: lastLocation()?.takeIf { it.isFresh() }
         return location?.let { Position(it.latitude, it.longitude, it.accuracy.toDouble()) }
     }
+
+    override fun isLocationEnabled(): Boolean = LocationManagerCompat.isLocationEnabled(locationManager)
 
     private fun hasLocationPermission(): Boolean = LOCATION_PERMISSIONS.any {
         ContextCompat.checkSelfPermission(context, it) == PackageManager.PERMISSION_GRANTED

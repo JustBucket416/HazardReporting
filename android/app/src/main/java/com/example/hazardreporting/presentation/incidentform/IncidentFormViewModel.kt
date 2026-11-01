@@ -253,7 +253,8 @@ class IncidentFormViewModel @Inject constructor(
 
     /**
      * Captures the position once location permission was answered. Approximate permission is enough;
-     * without any, the report is saved without a position
+     * without any, the report is saved without a position. If location is turned off on the device,
+     * the technician is first asked to turn it on
      *
      * @param isGranted whether fine or coarse location permission is granted
      */
@@ -265,14 +266,29 @@ class IncidentFormViewModel @Inject constructor(
         }
         form.update { it.copy(positionStatus = PositionStatus.Locating) }
         positionJob = viewModelScope.launch(exceptionHandler + dispatchers.default) {
-            val position = incidentInteractor.capturePosition()
-            form.update {
-                it.copy(
-                    position = position?.let { captured -> FormPosition.of(captured) },
-                    positionStatus = if (position != null) PositionStatus.Captured else PositionStatus.Unavailable,
-                )
+            if (incidentInteractor.isLocationEnabled()) {
+                capturePosition()
+            } else {
+                // No fix arrives while location is off; the form keeps locating until the technician answers
+                _events.send(IncidentFormEvent.RequestEnableLocation)
             }
         }
+    }
+
+    /**
+     * Captures the position once the technician answered the request to turn location on.
+     * If it stays off, the report is saved without a position
+     *
+     * @param isEnabled whether location is on now
+     */
+    fun onEnableLocationResult(isEnabled: Boolean) {
+        if (positionJob?.isActive == true) return
+        if (!isEnabled) {
+            form.update { it.copy(position = null, positionStatus = PositionStatus.LocationOff) }
+            return
+        }
+        form.update { it.copy(positionStatus = PositionStatus.Locating) }
+        positionJob = viewModelScope.launch(exceptionHandler + dispatchers.default) { capturePosition() }
     }
 
     /**
@@ -386,6 +402,16 @@ class IncidentFormViewModel @Inject constructor(
                     isPrefilled = true,
                 )
             }
+        }
+    }
+
+    private suspend fun capturePosition() {
+        val position = incidentInteractor.capturePosition()
+        form.update {
+            it.copy(
+                position = position?.let { captured -> FormPosition.of(captured) },
+                positionStatus = if (position != null) PositionStatus.Captured else PositionStatus.Unavailable,
+            )
         }
     }
 

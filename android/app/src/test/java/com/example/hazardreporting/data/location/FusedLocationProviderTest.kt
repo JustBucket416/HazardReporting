@@ -4,8 +4,10 @@ import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
 import android.location.Location
+import android.location.LocationManager
 import android.os.SystemClock
 import androidx.core.content.ContextCompat
+import androidx.core.location.LocationManagerCompat
 import com.example.hazardreporting.domain.model.Position
 import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.Priority
@@ -32,19 +34,34 @@ class FusedLocationProviderTest {
 
     private val context = mockk<Context>()
     private val client = mockk<FusedLocationProviderClient>()
+    private val locationManager = mockk<LocationManager>()
 
-    private val provider = FusedLocationProvider(context, client)
+    private val provider = FusedLocationProvider(context, client, locationManager)
 
     @Before
     fun setUp() {
-        mockkStatic(ContextCompat::class, SystemClock::class)
+        mockkStatic(ContextCompat::class, SystemClock::class, LocationManagerCompat::class)
         every { SystemClock.elapsedRealtimeNanos() } returns NOW_NANOS
         grant(fine = true, coarse = true)
     }
 
     @After
     fun tearDown() {
-        unmockkStatic(ContextCompat::class, SystemClock::class)
+        unmockkStatic(ContextCompat::class, SystemClock::class, LocationManagerCompat::class)
+    }
+
+    @Test
+    fun testIsLocationEnabled_On() {
+        every { LocationManagerCompat.isLocationEnabled(locationManager) } returns true
+
+        Truth.assertThat(provider.isLocationEnabled()).isTrue()
+    }
+
+    @Test
+    fun testIsLocationEnabled_Off() {
+        every { LocationManagerCompat.isLocationEnabled(locationManager) } returns false
+
+        Truth.assertThat(provider.isLocationEnabled()).isFalse()
     }
 
     @Test

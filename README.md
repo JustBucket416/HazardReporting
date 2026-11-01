@@ -21,13 +21,18 @@ The domain language is in [GLOSSARY.md](GLOSSARY.md), the decisions and their re
 
 ## Run it
 
-1. **Server** (port 3001):
+1. **Server** (port 3001), from the repo root:
+
+   Linux / macOS:
    ```bash
-   cd server
-   npm install
-   npm run reset
-   npm run dev
+   cd server && npm install && npm run reset && npm run dev
    ```
+
+   Windows (PowerShell):
+   ```powershell
+   cd server; npm install; if ($?) { npm run reset; if ($?) { npm run dev } }
+   ```
+
    `npm run reset` restores the seed data, deletes uploaded photos and signs everyone out. `npm test` runs the server's test suite.
 
 2. **Dashboard** (port 3000), in a second terminal:
@@ -61,13 +66,3 @@ The app accepts technicians only, and the dashboard accepts operators only.
 5. Withdraw an Open incident in the app. It disappears from the app and shows as Withdrawn on the dashboard.
 6. On the dashboard, filter by severity Critical and status Open, add a note to an incident and resolve one. In the app, pull to refresh: the incident shows Resolved, but never the note or the assignee.
 7. Go offline, report another incident, and log out. The app warns that 1 report will be lost before it wipes the device.
-
-## Android builds on Windows
-
-If Gradle fails with `Unable to establish loopback connection`, point Java at a temp folder without a short (8.3) path name, for example:
-
-```powershell
-$env:JAVA_TOOL_OPTIONS = "-Djdk.net.unixdomain.tmpdir=F:\tmp"
-```
-
-If KSP fails with an incremental-cache error about "different roots" (Gradle cache and project on different drives), delete `android/app/build/kspCaches` and build again.
