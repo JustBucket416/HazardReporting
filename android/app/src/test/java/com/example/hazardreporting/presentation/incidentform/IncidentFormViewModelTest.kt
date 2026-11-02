@@ -15,7 +15,6 @@ import com.example.hazardreporting.domain.model.Position
 import com.example.hazardreporting.domain.model.Severity
 import com.example.hazardreporting.domain.model.Site
 import com.example.hazardreporting.presentation.navigation.IncidentForm
-import com.example.hazardreporting.utils.CoroutineDispatchers
 import com.example.hazardreporting.utils.Logger
 import com.example.hazardreporting.utils.MainCoroutineRule
 import com.google.common.truth.Truth
@@ -57,13 +56,11 @@ class IncidentFormViewModelTest {
     private val savedStateHandle = SavedStateHandle()
     private val incidentInteractor = mockk<IncidentInteractor>()
     private val catalogInteractor = mockk<CatalogInteractor>()
-    private val dispatchers = mockk<CoroutineDispatchers>()
 
     @Before
     fun setUp() {
         mockkObject(Logger)
         mockkStatic(SAVED_STATE_HANDLE_KT)
-        every { dispatchers.default } returns rule.testDispatcher
         every { catalogInteractor.observeCategories() } returns flowOf(listOf(CATEGORY))
         every { catalogInteractor.observeSeverities() } returns flowOf(listOf(SEVERITY))
         every { catalogInteractor.observeSites() } returns flowOf(listOf(SITE))
@@ -773,22 +770,6 @@ class IncidentFormViewModelTest {
     }
 
     @Test
-    fun testFormState_TextChangesWithoutDispatching() = runTest {
-        val viewModel = createViewModel()
-
-        // Keystrokes typed faster than the dispatcher runs must all reach the text fields, in order
-        viewModel.onTitleChange("B")
-        viewModel.onTitleChange("Br")
-        viewModel.onDescriptionChange("Rail")
-        viewModel.onLocationDescriptionChange("Dock 2")
-
-        val fields = viewModel.formState.value.fields
-        Truth.assertThat(fields.title).isEqualTo("Br")
-        Truth.assertThat(fields.description).isEqualTo("Rail")
-        Truth.assertThat(fields.locationDescription).isEqualTo("Dock 2")
-    }
-
-    @Test
     fun testOnCloseRequest_NoChanges() = runTest {
         coEvery { incidentInteractor.capturePosition() } returns POSITION
 
@@ -925,7 +906,7 @@ class IncidentFormViewModelTest {
 
     private fun createViewModel(localId: Long? = null): IncidentFormViewModel {
         every { savedStateHandle.toRoute(IncidentForm::class, any()) } returns IncidentForm(localId)
-        return IncidentFormViewModel(savedStateHandle, incidentInteractor, catalogInteractor, dispatchers)
+        return IncidentFormViewModel(savedStateHandle, incidentInteractor, catalogInteractor)
     }
 
     /**

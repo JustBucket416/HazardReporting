@@ -5,7 +5,6 @@ import com.example.hazardreporting.domain.model.User
 import com.example.hazardreporting.domain.model.UserRole
 import com.example.hazardreporting.presentation.navigation.IncidentList
 import com.example.hazardreporting.presentation.navigation.Login
-import com.example.hazardreporting.utils.CoroutineDispatchers
 import com.example.hazardreporting.utils.Logger
 import com.example.hazardreporting.utils.MainCoroutineRule
 import com.google.common.truth.Truth
@@ -36,12 +35,10 @@ class MainViewModelTest {
     val rule = MainCoroutineRule()
 
     private val loginInteractor = mockk<LoginInteractor>()
-    private val dispatchers = mockk<CoroutineDispatchers>()
 
     @Before
     fun setUp() {
         mockkObject(Logger)
-        every { dispatchers.default } returns rule.testDispatcher
     }
 
     @After
@@ -53,7 +50,7 @@ class MainViewModelTest {
     fun testInit_SignedIn() = runTest {
         coEvery { loginInteractor.currentUser() } returns USER
 
-        val viewModel = MainViewModel(loginInteractor, dispatchers)
+        val viewModel = MainViewModel(loginInteractor)
 
         // The splash screen stays up until the start screen is known
         Truth.assertThat(viewModel.uiState.value.startDestination).isNull()
@@ -69,7 +66,7 @@ class MainViewModelTest {
     fun testInit_SignedOut() = runTest {
         coEvery { loginInteractor.currentUser() } returns null
 
-        val viewModel = MainViewModel(loginInteractor, dispatchers)
+        val viewModel = MainViewModel(loginInteractor)
         advanceUntilIdle()
 
         coVerifySequence { loginInteractor.currentUser() }
@@ -84,7 +81,7 @@ class MainViewModelTest {
         coEvery { loginInteractor.currentUser() } throws exception
         justRun { Logger.error(any(), any(), exception) }
 
-        val viewModel = MainViewModel(loginInteractor, dispatchers)
+        val viewModel = MainViewModel(loginInteractor)
         advanceUntilIdle()
 
         verifySequence { Logger.error("MainViewModel", any(), exception) }

@@ -274,7 +274,7 @@ Logout wipe order ([ADR-0007](../../docs/adr/0007-logout-wipes-device-data.md)):
 ### 3.5 Presentation (`presentation`)
 - **Screen structure:** each screen is split into `XxxRoute(viewModel)` and a stateless `XxxScreen(state, onAction…)`. The ViewModel exposes one `StateFlow<XxxUiState>` and a `Flow<XxxEvent>`.
 - **ViewModel coroutines:**
-  - ViewModels launch with `viewModelScope.launch(exceptionHandler + dispatchers.default)`.
+  - ViewModels launch with `viewModelScope.launch(exceptionHandler)`, on Main.
   - The shared handler logs through `Logger` and calls the ViewModel's `onUnexpected`, which clears loading state and shows a "Something went wrong" snackbar.
 - **Look and feel:**
   - Material 3 with a fixed brand scheme (no dynamic colour), light and dark themes, and edge-to-edge.

@@ -3,8 +3,8 @@
 **Threading.** The code that produces data decides which thread it runs on:
 - Repositories switch with `withContext(dispatchers.io)` and `flowOn(dispatchers.io)`.
 - Interactors never switch context.
-- ViewModels launch with `viewModelScope.launch(exceptionHandler + dispatchers.default)`, so interactor work runs off Main.
-- Because ViewModel code runs on the multi-threaded Default dispatcher, UI state is changed only through `MutableStateFlow.update {}`.
+- ViewModels launch with `viewModelScope.launch(exceptionHandler)`, on Main. Interactor work runs there too, which is safe because every blocking call sits behind a repository that switches to IO.
+- UI state is still changed only through `MutableStateFlow.update {}`.
 
 Dispatchers come from an injected `CoroutineDispatchers` class, which tests mock.
 
@@ -19,4 +19,4 @@ Dispatchers come from an injected `CoroutineDispatchers` class, which tests mock
 ## Considered Options
 
 - **The ViewModel switches to IO and back to Main**, as in the reference project. Rejected: the data producer should own the threading choice.
-- **Main-safe data with ViewModels launching on Main.** Rejected so that interactor work never runs on the UI thread.
+- **ViewModels launching on the Default dispatcher**, so that interactor work never runs on Main. Used at first, then dropped: UI state reached the screen after a thread hop, and the report form needed a second state flow so its text fields wouldn't drop keystrokes.

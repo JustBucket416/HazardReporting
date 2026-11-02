@@ -14,7 +14,6 @@ import com.example.hazardreporting.domain.model.Site
 import com.example.hazardreporting.domain.model.SyncState
 import com.example.hazardreporting.presentation.common.BaseViewModel
 import com.example.hazardreporting.presentation.navigation.IncidentDetail
-import com.example.hazardreporting.utils.CoroutineDispatchers
 import javax.inject.Inject
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
@@ -37,7 +36,6 @@ import kotlinx.coroutines.plus
  * @param savedStateHandle holds the route with the incident's local id
  * @property incidentInteractor used for observing the incident and downloading its details
  * @param catalogInteractor used for naming the incident's category, severity and site
- * @property dispatchers used for launching off the main thread
  *
  * @author Roman Pliskin on 29.10.2026
  */
@@ -45,7 +43,6 @@ class IncidentDetailViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val incidentInteractor: IncidentInteractor,
     catalogInteractor: CatalogInteractor,
-    private val dispatchers: CoroutineDispatchers,
 ) : BaseViewModel() {
 
     private val localId = savedStateHandle.toRoute<IncidentDetail>().localId
@@ -69,7 +66,7 @@ class IncidentDetailViewModel @Inject constructor(
     ) { incident, catalog, load, isWithdrawDialogVisible ->
         toUiState(incident, catalog, load, isWithdrawDialogVisible)
     }.stateIn(
-        scope = viewModelScope + exceptionHandler + dispatchers.default,
+        scope = viewModelScope + exceptionHandler,
         started = SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS),
         initialValue = IncidentDetailUiState(),
     )
@@ -117,7 +114,7 @@ class IncidentDetailViewModel @Inject constructor(
      */
     fun onWithdrawConfirm() {
         isWithdrawDialogVisible.update { false }
-        viewModelScope.launch(exceptionHandler + dispatchers.default) {
+        viewModelScope.launch(exceptionHandler) {
             incidentInteractor.withdraw(localId)
             _events.send(IncidentDetailEvent.Withdrawn)
         }
@@ -127,7 +124,7 @@ class IncidentDetailViewModel @Inject constructor(
      * Clears the Status Change Notice once the technician has read it
      */
     fun onDismissStatusChangeNotice() {
-        viewModelScope.launch(exceptionHandler + dispatchers.default) {
+        viewModelScope.launch(exceptionHandler) {
             incidentInteractor.dismissStatusChangeNotice(localId)
         }
     }
@@ -141,7 +138,7 @@ class IncidentDetailViewModel @Inject constructor(
         val previous = loadStatus.getAndUpdate { if (it.inFlight == null) it.copy(inFlight = kind) else it }
         if (previous.inFlight != null) return
 
-        viewModelScope.launch(exceptionHandler + dispatchers.default) {
+        viewModelScope.launch(exceptionHandler) {
             val succeeded = try {
                 incidentInteractor.loadIncidentDetails(localId, force = kind == LoadKind.Refresh)
                 true

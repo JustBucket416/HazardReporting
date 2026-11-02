@@ -8,7 +8,6 @@ import com.example.hazardreporting.domain.exception.NotTechnicianException
 import com.example.hazardreporting.domain.interactor.LoginInteractor
 import com.example.hazardreporting.domain.model.User
 import com.example.hazardreporting.domain.model.UserRole
-import com.example.hazardreporting.utils.CoroutineDispatchers
 import com.example.hazardreporting.utils.Logger
 import com.example.hazardreporting.utils.MainCoroutineRule
 import com.google.common.truth.Truth
@@ -40,16 +39,14 @@ class LoginViewModelTest {
 
     private val savedStateHandle = SavedStateHandle()
     private val loginInteractor = mockk<LoginInteractor>()
-    private val dispatchers = mockk<CoroutineDispatchers>()
 
     private lateinit var viewModel: LoginViewModel
 
     @Before
     fun setUp() {
         mockkObject(Logger)
-        every { dispatchers.default } returns rule.testDispatcher
 
-        viewModel = LoginViewModel(savedStateHandle, loginInteractor, dispatchers)
+        viewModel = LoginViewModel(savedStateHandle, loginInteractor)
         viewModel.onEmailChange(EMAIL)
         viewModel.onPasswordChange(PASSWORD)
     }
@@ -207,7 +204,7 @@ class LoginViewModelTest {
     @Test
     fun testInit_RestoresEmail() {
         val restoredViewModel = LoginViewModel(
-            SavedStateHandle(mapOf(KEY_EMAIL to OTHER_EMAIL)), loginInteractor, dispatchers
+            SavedStateHandle(mapOf(KEY_EMAIL to OTHER_EMAIL)), loginInteractor
         )
 
         Truth.assertThat(restoredViewModel.uiState.value).isEqualTo(LoginUiState(email = OTHER_EMAIL))

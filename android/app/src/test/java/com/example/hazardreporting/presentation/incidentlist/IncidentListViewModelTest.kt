@@ -16,7 +16,6 @@ import com.example.hazardreporting.domain.model.Severity
 import com.example.hazardreporting.domain.model.Site
 import com.example.hazardreporting.domain.model.SyncState
 import com.example.hazardreporting.presentation.navigation.IncidentList
-import com.example.hazardreporting.utils.CoroutineDispatchers
 import com.example.hazardreporting.utils.Logger
 import com.example.hazardreporting.utils.MainCoroutineRule
 import com.google.common.truth.Truth
@@ -59,7 +58,6 @@ class IncidentListViewModelTest {
     private val incidentInteractor = mockk<IncidentInteractor>()
     private val catalogInteractor = mockk<CatalogInteractor>()
     private val loginInteractor = mockk<LoginInteractor>()
-    private val dispatchers = mockk<CoroutineDispatchers>()
     private val incidents = MutableStateFlow<List<IncidentSummary>>(emptyList())
     private val isSessionInvalid = MutableStateFlow(false)
 
@@ -67,7 +65,6 @@ class IncidentListViewModelTest {
     fun setUp() {
         mockkObject(Logger)
         mockkStatic(SAVED_STATE_HANDLE_KT)
-        every { dispatchers.default } returns rule.testDispatcher
         every { incidentInteractor.observeMyIncidents() } returns incidents
         every { catalogInteractor.observeCategories() } returns flowOf(listOf(CATEGORY))
         every { catalogInteractor.observeSeverities() } returns flowOf(listOf(SEVERITY))
@@ -544,7 +541,6 @@ class IncidentListViewModelTest {
             incidentInteractor,
             catalogInteractor,
             loginInteractor,
-            dispatchers,
         )
     }
 

@@ -97,7 +97,6 @@ import kotlinx.coroutines.launch
 @Composable
 fun IncidentFormRoute(viewModel: IncidentFormViewModel, onClose: () -> Unit, onSaved: () -> Unit) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-    val formState by viewModel.formState.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val snackbarHostState = remember { SnackbarHostState() }
     val coroutineScope = rememberCoroutineScope()
@@ -155,12 +154,7 @@ fun IncidentFormRoute(viewModel: IncidentFormViewModel, onClose: () -> Unit, onS
     BackHandler(onBack = viewModel::onCloseRequest)
 
     IncidentFormScreen(
-        // Texts come straight from the form, so every keystroke reaches the text fields in order
-        uiState = uiState.copy(
-            title = formState.fields.title,
-            description = formState.fields.description,
-            locationDescription = formState.fields.locationDescription,
-        ),
+        uiState = uiState,
         snackbarHostState = snackbarHostState,
         actions = IncidentFormActions(
             onClose = viewModel::onCloseRequest,

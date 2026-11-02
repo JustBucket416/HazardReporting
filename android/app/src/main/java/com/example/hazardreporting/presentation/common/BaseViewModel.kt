@@ -6,7 +6,7 @@ import kotlinx.coroutines.CoroutineExceptionHandler
 
 /**
  * Base class of the app's ViewModels. It owns the shared [exceptionHandler], so every ViewModel
- * launches with `viewModelScope.launch(exceptionHandler + dispatchers.default)` (ADR-0009)
+ * launches with `viewModelScope.launch(exceptionHandler)`, on the main thread (ADR-0009)
  *
  * @author Roman Pliskin on 29.10.2026
  */

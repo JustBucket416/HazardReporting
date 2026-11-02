@@ -6,7 +6,6 @@ import com.example.hazardreporting.presentation.common.BaseViewModel
 import com.example.hazardreporting.presentation.navigation.Destination
 import com.example.hazardreporting.presentation.navigation.IncidentList
 import com.example.hazardreporting.presentation.navigation.Login
-import com.example.hazardreporting.utils.CoroutineDispatchers
 import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -18,13 +17,11 @@ import kotlinx.coroutines.launch
  * Decides where the app starts, while [MainActivity] keeps the splash screen up
  *
  * @property loginInteractor used for finding out whether someone is signed in
- * @property dispatchers used for launching off the main thread
  *
  * @author Roman Pliskin on 29.10.2026
  */
 class MainViewModel @Inject constructor(
     private val loginInteractor: LoginInteractor,
-    private val dispatchers: CoroutineDispatchers,
 ) : BaseViewModel() {
 
     private val _uiState = MutableStateFlow(MainUiState())
@@ -35,7 +32,7 @@ class MainViewModel @Inject constructor(
     val uiState: StateFlow<MainUiState> = _uiState.asStateFlow()
 
     init {
-        viewModelScope.launch(exceptionHandler + dispatchers.default) {
+        viewModelScope.launch(exceptionHandler) {
             val startDestination = if (loginInteractor.currentUser() != null) IncidentList() else Login
             _uiState.update { it.copy(startDestination = startDestination) }
         }
