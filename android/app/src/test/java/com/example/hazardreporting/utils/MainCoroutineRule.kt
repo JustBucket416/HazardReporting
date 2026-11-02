@@ -12,7 +12,7 @@ import org.junit.runner.Description
 /**
  * Replaces [Dispatchers.Main] with [testDispatcher] for the duration of a test
  *
- * @property testDispatcher dispatcher to use as Main; also handed to classes under test through mocked [CoroutineDispatchers]
+ * @property testDispatcher dispatcher to use as Main, where ViewModels launch their work
  *
  * @author Roman Pliskin on 29.10.2026
  */

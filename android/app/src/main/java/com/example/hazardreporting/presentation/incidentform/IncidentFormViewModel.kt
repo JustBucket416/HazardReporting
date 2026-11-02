@@ -14,7 +14,6 @@ import com.example.hazardreporting.domain.model.Severity
 import com.example.hazardreporting.domain.model.Site
 import com.example.hazardreporting.presentation.common.BaseViewModel
 import com.example.hazardreporting.presentation.navigation.IncidentForm
-import com.example.hazardreporting.utils.CoroutineDispatchers
 import javax.inject.Inject
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
@@ -22,7 +21,6 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.getAndUpdate
 import kotlinx.coroutines.flow.receiveAsFlow
@@ -47,7 +45,6 @@ import kotlinx.coroutines.plus
  * @property incidentInteractor used for validating and saving the report, capturing the position and managing
  * photo files
  * @param catalogInteractor used for the categories, severities and sites to choose from
- * @property dispatchers used for launching off the main thread
  *
  * @author Roman Pliskin on 29.10.2026
  */
@@ -55,7 +52,6 @@ class IncidentFormViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val incidentInteractor: IncidentInteractor,
     catalogInteractor: CatalogInteractor,
-    private val dispatchers: CoroutineDispatchers,
 ) : BaseViewModel() {
 
     private val editedLocalId = savedStateHandle.toRoute<IncidentForm>().localId
@@ -81,17 +77,10 @@ class IncidentFormViewModel @Inject constructor(
     ) { form, categories, severities, sites, overlays ->
         toUiState(form, categories, severities, sites, overlays)
     }.stateIn(
-        scope = viewModelScope + exceptionHandler + dispatchers.default,
+        scope = viewModelScope + exceptionHandler,
         started = SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS),
         initialValue = IncidentFormUiState(isEditing = isEditing, isLoading = isEditing),
     )
-
-    /**
-     * The form as the technician edits it. The text fields read their text from here rather than from [uiState]:
-     * [uiState] is built on the Default dispatcher, and a text field that gets its text back after a thread hop
-     * drops keystrokes typed in between
-     */
-    val formState: StateFlow<IncidentFormState> = form.asStateFlow()
 
     /**
      * One-off events of the report form
@@ -99,7 +88,7 @@ class IncidentFormViewModel @Inject constructor(
     val events: Flow<IncidentFormEvent> = _events.receiveAsFlow()
 
     init {
-        viewModelScope.launch(exceptionHandler + dispatchers.default) {
+        viewModelScope.launch(exceptionHandler) {
             form.collect { state -> savedForm.update { state.encode() } }
         }
         if (editedLocalId != null) {
@@ -181,7 +170,7 @@ class IncidentFormViewModel @Inject constructor(
      */
     fun onCameraSelect() {
         overlays.update { it.copy(isPhotoSourceSheetVisible = false) }
-        viewModelScope.launch(exceptionHandler + dispatchers.default) {
+        viewModelScope.launch(exceptionHandler) {
             val photo = incidentInteractor.createPhotoFile()
             form.update { it.copy(pendingCameraPhotoPath = photo.path) }
             _events.send(IncidentFormEvent.TakePhoto(photo.path))
@@ -200,7 +189,7 @@ class IncidentFormViewModel @Inject constructor(
             discardPhotos(listOf(path))
             return
         }
-        viewModelScope.launch(exceptionHandler + dispatchers.default) {
+        viewModelScope.launch(exceptionHandler) {
             val photo = Photo.Local(path)
             try {
                 incidentInteractor.checkPhoto(photo)
@@ -227,7 +216,7 @@ class IncidentFormViewModel @Inject constructor(
      */
     fun onPhotoPicked(sourceUri: String?) {
         if (sourceUri == null) return
-        viewModelScope.launch(exceptionHandler + dispatchers.default) {
+        viewModelScope.launch(exceptionHandler) {
             try {
                 attachPhoto(incidentInteractor.importPhoto(sourceUri))
             } catch (e: PhotoTooLargeException) {
@@ -265,7 +254,7 @@ class IncidentFormViewModel @Inject constructor(
             return
         }
         form.update { it.copy(positionStatus = PositionStatus.Locating) }
-        positionJob = viewModelScope.launch(exceptionHandler + dispatchers.default) {
+        positionJob = viewModelScope.launch(exceptionHandler) {
             if (incidentInteractor.isLocationEnabled()) {
                 capturePosition()
             } else {
@@ -288,7 +277,7 @@ class IncidentFormViewModel @Inject constructor(
             return
         }
         form.update { it.copy(positionStatus = PositionStatus.Locating) }
-        positionJob = viewModelScope.launch(exceptionHandler + dispatchers.default) { capturePosition() }
+        positionJob = viewModelScope.launch(exceptionHandler) { capturePosition() }
     }
 
     /**
@@ -310,7 +299,7 @@ class IncidentFormViewModel @Inject constructor(
         val draft = form.updateAndGet { it.copy(isSaveAttempted = true) }.toDraft()
         if (isSaving.getAndUpdate { true }) return
 
-        viewModelScope.launch(exceptionHandler + dispatchers.default) {
+        viewModelScope.launch(exceptionHandler) {
             try {
                 if (editedLocalId != null) {
                     incidentInteractor.edit(editedLocalId, draft)
@@ -347,7 +336,7 @@ class IncidentFormViewModel @Inject constructor(
         overlays.update { it.copy(isDiscardDialogVisible = false) }
         if (isSaving.value) return
         val addedPhotoPaths = form.value.addedPhotoPaths
-        viewModelScope.launch(exceptionHandler + dispatchers.default) {
+        viewModelScope.launch(exceptionHandler) {
             addedPhotoPaths.forEach { incidentInteractor.discardPhoto(Photo.Local(it)) }
             _events.send(IncidentFormEvent.Closed)
         }
@@ -376,7 +365,7 @@ class IncidentFormViewModel @Inject constructor(
     }
 
     private fun prefill(localId: Long) {
-        viewModelScope.launch(exceptionHandler + dispatchers.default) {
+        viewModelScope.launch(exceptionHandler) {
             val draft = incidentInteractor.getDraft(localId)
             if (draft == null) {
                 _events.send(IncidentFormEvent.Closed)
@@ -436,7 +425,7 @@ class IncidentFormViewModel @Inject constructor(
     }
 
     private fun discardPhotos(paths: List<String>) {
-        viewModelScope.launch(exceptionHandler + dispatchers.default) {
+        viewModelScope.launch(exceptionHandler) {
             paths.forEach { incidentInteractor.discardPhoto(Photo.Local(it)) }
         }
     }

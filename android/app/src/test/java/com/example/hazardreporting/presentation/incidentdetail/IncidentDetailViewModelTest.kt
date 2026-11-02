@@ -18,7 +18,6 @@ import com.example.hazardreporting.domain.model.Severity
 import com.example.hazardreporting.domain.model.Site
 import com.example.hazardreporting.domain.model.SyncState
 import com.example.hazardreporting.presentation.navigation.IncidentDetail
-import com.example.hazardreporting.utils.CoroutineDispatchers
 import com.example.hazardreporting.utils.Logger
 import com.example.hazardreporting.utils.MainCoroutineRule
 import com.google.common.truth.Truth
@@ -61,7 +60,6 @@ class IncidentDetailViewModelTest {
     private val savedStateHandle = SavedStateHandle()
     private val incidentInteractor = mockk<IncidentInteractor>()
     private val catalogInteractor = mockk<CatalogInteractor>()
-    private val dispatchers = mockk<CoroutineDispatchers>()
     private val incident = MutableStateFlow(Incident(SUMMARY, details = null))
 
     @Before
@@ -69,7 +67,6 @@ class IncidentDetailViewModelTest {
         mockkObject(Logger)
         mockkStatic(SAVED_STATE_HANDLE_KT)
         every { savedStateHandle.toRoute(IncidentDetail::class, any()) } returns IncidentDetail(LOCAL_ID)
-        every { dispatchers.default } returns rule.testDispatcher
         every { incidentInteractor.observeIncident(LOCAL_ID) } returns incident
         every { catalogInteractor.observeCategories() } returns flowOf(listOf(CATEGORY))
         every { catalogInteractor.observeSeverities() } returns flowOf(listOf(SEVERITY))
@@ -401,7 +398,7 @@ class IncidentDetailViewModelTest {
     }
 
     private fun createViewModel() =
-        IncidentDetailViewModel(savedStateHandle, incidentInteractor, catalogInteractor, dispatchers)
+        IncidentDetailViewModel(savedStateHandle, incidentInteractor, catalogInteractor)
 
     /**
      * Subscribes to the state the way the screen does, so the ViewModel's flows run

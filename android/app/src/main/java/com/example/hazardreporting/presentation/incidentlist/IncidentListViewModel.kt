@@ -16,7 +16,6 @@ import com.example.hazardreporting.domain.model.Site
 import com.example.hazardreporting.domain.model.SyncState
 import com.example.hazardreporting.presentation.common.BaseViewModel
 import com.example.hazardreporting.presentation.navigation.IncidentList
-import com.example.hazardreporting.utils.CoroutineDispatchers
 import javax.inject.Inject
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
@@ -42,7 +41,6 @@ import kotlinx.coroutines.plus
  * @property incidentInteractor used for observing and refreshing the incidents
  * @param catalogInteractor used for naming each incident's category, severity and site
  * @property loginInteractor used for observing whether the session is still valid, and for signing out
- * @property dispatchers used for launching off the main thread
  *
  * @author Roman Pliskin on 29.10.2026
  */
@@ -51,7 +49,6 @@ class IncidentListViewModel @Inject constructor(
     private val incidentInteractor: IncidentInteractor,
     catalogInteractor: CatalogInteractor,
     private val loginInteractor: LoginInteractor,
-    private val dispatchers: CoroutineDispatchers,
 ) : BaseViewModel() {
 
     private val refreshStatus = MutableStateFlow(RefreshStatus())
@@ -76,7 +73,7 @@ class IncidentListViewModel @Inject constructor(
     ) { incidents, catalog, refresh, isSessionInvalid, logoutDialog ->
         toUiState(incidents, catalog, refresh, isSessionInvalid, logoutDialog)
     }.stateIn(
-        scope = viewModelScope + exceptionHandler + dispatchers.default,
+        scope = viewModelScope + exceptionHandler,
         started = SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS),
         initialValue = IncidentListUiState(),
     )
@@ -147,7 +144,7 @@ class IncidentListViewModel @Inject constructor(
     private fun logout(force: Boolean) {
         if (isLoggingOut.getAndUpdate { true }) return
 
-        viewModelScope.launch(exceptionHandler + dispatchers.default) {
+        viewModelScope.launch(exceptionHandler) {
             logoutDialog.update { LogoutDialog.Sending(loginInteractor.countPendingChanges()) }
             when (val result = loginInteractor.logout(force)) {
                 // The dialog stays until the screen is gone
@@ -164,7 +161,7 @@ class IncidentListViewModel @Inject constructor(
         val previous = refreshStatus.getAndUpdate { if (it.inFlight == null) it.copy(inFlight = kind) else it }
         if (previous.inFlight != null) return
 
-        viewModelScope.launch(exceptionHandler + dispatchers.default) {
+        viewModelScope.launch(exceptionHandler) {
             val succeeded = try {
                 incidentInteractor.refreshIncidents()
                 true
